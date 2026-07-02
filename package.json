@@ -1,0 +1,41 @@
+{
+  "name": "@meetstream/cli",
+  "version": "0.1.0",
+  "description": "Official MeetStream CLI — create meeting bots, fetch transcripts, and stream webhook events from your terminal. Zoom, Google Meet, Microsoft Teams.",
+  "type": "module",
+  "bin": {
+    "meetstream": "bin/meetstream.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18.17"
+  },
+  "dependencies": {
+    "commander": "^15.0.0"
+  },
+  "keywords": [
+    "meetstream",
+    "meeting-bot",
+    "transcription",
+    "zoom",
+    "google-meet",
+    "microsoft-teams",
+    "cli",
+    "meeting-intelligence"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/meetstream-ai/meetstream-cli.git"
+  },
+  "homepage": "https://docs.meetstream.ai",
+  "author": "MeetStream.ai <hello@meetstream.ai>",
+  "license": "MIT"
+}
