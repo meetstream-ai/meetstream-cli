@@ -186,3 +186,11 @@ npm test          # node --test, fully mocked (no network)
 Docs: [docs.meetstream.ai](https://docs.meetstream.ai) · OpenAPI: [openapi.json](https://docs.meetstream.ai/openapi.json) · MCP server for AI agents: [@meetstream/mcp](https://github.com/meetstream-ai/meetstream-mcp) · Migrating from Recall.ai: [@meetstream/migrate](https://github.com/meetstream-ai/recall-meetstream-migration-kit)
 
 MIT © MeetStream.ai
+
+## Telemetry
+
+The CLI sends **anonymous** usage events (which commands you run) to help us improve MeetStream. It never sends your API key, meeting URLs, transcripts, or any content. Disable it any time:
+
+```bash
+export MEETSTREAM_TELEMETRY=0   # or the standard DO_NOT_TRACK=1
+```
