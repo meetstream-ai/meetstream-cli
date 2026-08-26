@@ -121,10 +121,10 @@ Keep output dual-mode: human-readable by default, machine-readable under `--json
 
 | Variable | Default | Notes |
 |---|---|---|
-| `MEETSTREAM_API_KEY` | — | Wins over the config file. Get one at https://app.meetstream.ai/api-key |
+| `MEETSTREAM_API_KEY` | - | Wins over the config file. Get one at https://app.meetstream.ai/api-key |
 | `MEETSTREAM_API_URL` | `https://api.meetstream.ai/api/v1` | Point at staging here |
 | `MEETSTREAM_TELEMETRY` | on | Set `0`/`false` to disable |
-| `DO_NOT_TRACK` | — | Honoured, disables telemetry |
+| `DO_NOT_TRACK` | - | Honoured, disables telemetry |
 
 Key resolution order: `MEETSTREAM_API_KEY`, then `~/.meetstream/config.json`. The config directory is written `0700` and the file `0600`; keep it that way. Never print a key in full - mask it the way `auth status` does.
 
