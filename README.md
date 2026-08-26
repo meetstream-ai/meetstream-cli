@@ -1,6 +1,6 @@
 # MeetStream CLI
 
-**The MeetStream meeting-bot API from your terminal.** Create bots that join Zoom, Google Meet, and Microsoft Teams meetings; record, transcribe, and interact — without writing a line of code.
+**The MeetStream meeting-bot API from your terminal.** Create bots that join Zoom, Google Meet, and Microsoft Teams meetings; record, transcribe, and interact - without writing a line of code.
 
 ```bash
 npm install -g @meetstream/cli     # or: npx @meetstream/cli ...
@@ -12,7 +12,7 @@ meetstream bot create "https://meet.google.com/abc-defg-hij" -t deepgram
 
 ## Authentication
 
-Every command authenticates to `https://api.meetstream.ai/api/v1` with `Authorization: Token <your-key>`. There's no OAuth flow or separate CLI login — the API key **is** the credential.
+Every command authenticates to `https://api.meetstream.ai/api/v1` with `Authorization: Token <your-key>`. There's no OAuth flow or separate CLI login - the API key **is** the credential.
 
 | Source | Precedence | Set with |
 |--------|------------|----------|
@@ -52,30 +52,30 @@ meetstream transcript <bot_id> --wait
 
 ## Full capability list
 
-### `auth` — credentials
+### `auth` - credentials
 | Command | What it does |
 |---------|---------------|
 | `auth set-key <key>` | Stores the key in `~/.meetstream/config.json` |
 | `auth status` | Validates the configured key against the live API and shows account info |
 
-### `bot` — lifecycle, media, interaction
+### `bot` - lifecycle, media, interaction
 | Command | What it does |
 |---------|---------------|
-| `bot create <meeting-link>` | Sends (or schedules with `--join-at`) a bot to the meeting. See [`bot create` options](#bot-create-options) below — transcription provider, callbacks, per-participant streams, MIA agent, live streaming, idempotency, and safe leave-timeout defaults. |
+| `bot create <meeting-link>` | Sends (or schedules with `--join-at`) a bot to the meeting. See [`bot create` options](#bot-create-options) below - transcription provider, callbacks, per-participant streams, MIA agent, live streaming, idempotency, and safe leave-timeout defaults. |
 | `bot list` | Lists every bot on the account with id, status, and platform |
 | `bot status <id> [--watch]` | Current status; `--watch` polls every 5s until a terminal state (`Stopped`/`Done`/`Error`/etc.) |
-| `bot detail <id>` | Full session metadata — platform, timings, status timeline, `transcript_id`, `caption_file` |
+| `bot detail <id>` | Full session metadata - platform, timings, status timeline, `transcript_id`, `caption_file` |
 | `bot summary <id>` | MeetStream's built-in AI meeting summary |
 | `bot audio <id>` / `bot video <id>` | Presigned recording URL (audio valid 1h, video valid 10min) |
 | `bot streams <id>` / `bot audio-streams <id>` | Per-participant video/audio streams (needs `--separate-video`/`--separate-audio` at creation) |
 | `bot participants <id>` | Everyone detected in the meeting |
 | `bot chats <id>` | In-meeting chat messages |
 | `bot screenshots <id>` | Screenshots captured during the meeting |
-| `bot timeline <id>` | Speaker timeline — who spoke when |
+| `bot timeline <id>` | Speaker timeline - who spoke when |
 | `bot send-message <id> <text...>` | Posts a chat message into the **live** meeting |
 | `bot send-image <id> <img-url> [-d seconds]` | Shows an image/GIF as the bot's video frame (public URL required) |
 | `bot remove <id>` | Makes the bot leave the meeting now (data is kept) |
-| `bot delete <id> --yes` | **Permanently** deletes audio/video/transcripts — the `--yes` flag is mandatory, no accidental deletes |
+| `bot delete <id> --yes` | **Permanently** deletes audio/video/transcripts - the `--yes` flag is mandatory, no accidental deletes |
 
 <a name="bot-create-options"></a>
 **`bot create` options:**
@@ -100,21 +100,21 @@ meetstream transcript <bot_id> --wait
 --live-video-ws <wss>            WebSocket URL for live video out
 --socket-ws <wss>                two-way bot-control WebSocket (socket_connection_url)
 --attr <key=value...>            custom_attributes entries (echoed back in webhooks)
---idempotency-key <uuid>         safe-retry key — a retry returns the original
+--idempotency-key <uuid>         safe-retry key - a retry returns the original
                                    bot (HTTP 507), never a duplicate
 --everyone-left-timeout <sec>    leave after everyone else leaves (default 60)
 --waiting-room-timeout <sec>     max seconds in waiting room (default 300)
 --max-recording-seconds <sec>    max in-call recording seconds (default 14400)
 ```
 
-### `transcript` / `transcriptions` / `transcribe` — transcription
+### `transcript` / `transcriptions` / `transcribe` - transcription
 | Command | What it does |
 |---------|---------------|
 | `transcript <bot-id> [--wait] [--raw] [--json]` | Fetches the transcript, resolving `transcript_id` automatically (it's never in webhooks). `--wait` polls until ready. Default output is readable `Speaker: text` lines. |
-| `transcriptions <bot-id>` | Lists every transcription run for a bot — provider, status, presigned download URLs |
+| `transcriptions <bot-id>` | Lists every transcription run for a bot - provider, status, presigned download URLs |
 | `transcribe <bot-id> -p <provider>` | (Re-)transcribes a bot's recorded audio, optionally with a different provider or language |
 
-### `calendar` — Google Calendar auto-join
+### `calendar` - Google Calendar auto-join
 | Command | What it does |
 |---------|---------------|
 | `calendar connect --client-id --client-secret --refresh-token` | Connects a Google Calendar via OAuth refresh-token flow |
@@ -125,14 +125,14 @@ meetstream transcript <bot_id> --wait
 | `calendar reschedule <bot-id> <iso8601>` | Change a scheduled bot's join time |
 | `calendar cancel <bot-id>` | Delete a scheduled (not-yet-joined) bot |
 
-### `mia` — conversational AI agents
+### `mia` - conversational AI agents
 | Command | What it does |
 |---------|---------------|
 | `mia list` | Lists agent configs |
-| `mia create -f <config.json>` | Creates an agent config (`agent_name`, `mode`, `model`, `voice`, `transcriber`, …) — attach it to a bot with `--agent-config-id` |
+| `mia create -f <config.json>` | Creates an agent config (`agent_name`, `mode`, `model`, `voice`, `transcriber`, …) - attach it to a bot with `--agent-config-id` |
 | `mia delete <agent-config-id>` | Deletes an agent config |
 
-### `listen` — local webhook receiver
+### `listen` - local webhook receiver
 | Command | What it does |
 |---------|---------------|
 | `listen [-p port] [--path path] [--forward url] [--json]` | Runs a local HTTP server that pretty-prints every MeetStream webhook event as it arrives, color-coded by outcome. Pair with `ngrok http <port>` to give `bot create --callback` a public URL during development. `--forward` also relays the raw payload to another URL. |
@@ -141,19 +141,19 @@ Every command supports `--json` for scripting.
 
 ---
 
-## The webhook model — live-verified
+## The webhook model - live-verified
 
-Events arrive under the **`event`** key with `bot_id`, `bot_status`, `message`, `status_code` (200/500), `custom_attributes` — this is exactly what `meetstream listen` decodes and pretty-prints for you:
+Events arrive under the **`event`** key with `bot_id`, `bot_status`, `message`, `status_code` (200/500), `custom_attributes` - this is exactly what `meetstream listen` decodes and pretty-prints for you:
 
 ```
 bot.joining → bot.in_waiting_room → bot.inmeeting → bot.recording → bot.leaving → bot.stopped
 → manifest.completed → audio.processed → transcription.processed → video.processed → bot.done
 ```
 
-- **`bot.stopped` fires once** — `bot_status` says why (`Stopped` normal · `NotAllowed` lobby-timeout · `Denied` host-denied · `Error` crash).
-- **Streaming-only transcription providers** (`deepgram_streaming`, `assemblyai_streaming`, `meeting_captions`) end at `audio.processed` — they never fire `transcription.processed`, `transcription.failed`, or `bot.done`.
-- **`transcript_id` is not in webhooks** — `meetstream transcript <bot_id>` resolves it via `/detail` automatically.
-- The public docs page for this describes a different (`bot_event`) envelope key — that's inaccurate; this CLI, and the [MeetStream MCP server](https://github.com/meetstream-ai/meetstream-mcp), both implement the live-verified model above.
+- **`bot.stopped` fires once** - `bot_status` says why (`Stopped` normal · `NotAllowed` lobby-timeout · `Denied` host-denied · `Error` crash).
+- **Streaming-only transcription providers** (`deepgram_streaming`, `assemblyai_streaming`, `meeting_captions`) end at `audio.processed` - they never fire `transcription.processed`, `transcription.failed`, or `bot.done`.
+- **`transcript_id` is not in webhooks** - `meetstream transcript <bot_id>` resolves it via `/detail` automatically.
+- The public docs page for this describes a different (`bot_event`) envelope key - that's inaccurate; this CLI, and the [MeetStream MCP server](https://github.com/meetstream-ai/meetstream-mcp), both implement the live-verified model above.
 
 ---
 
@@ -170,9 +170,9 @@ bot.joining → bot.in_waiting_room → bot.inmeeting → bot.recording → bot.
 | Symptom | Fix |
 |---------|-----|
 | "No API key found" | Run `meetstream auth set-key <key>` or `export MEETSTREAM_API_KEY=...` |
-| `auth status` fails with 401 | Key is invalid/revoked — generate a new one at [app.meetstream.ai/api-keys](https://app.meetstream.ai/api-keys) |
-| `transcript` returns "not ready yet" | The meeting isn't fully processed, or the provider is streaming-only (no post-call transcript) — check `bot status` first |
-| `listen` events never arrive | Confirm the bot's `--callback` URL is a public HTTPS URL (use `ngrok http <port>`) — MeetStream will not retry non-2xx or unreachable webhooks |
+| `auth status` fails with 401 | Key is invalid/revoked - generate a new one at [app.meetstream.ai/api-keys](https://app.meetstream.ai/api-keys) |
+| `transcript` returns "not ready yet" | The meeting isn't fully processed, or the provider is streaming-only (no post-call transcript) - check `bot status` first |
+| `listen` events never arrive | Confirm the bot's `--callback` URL is a public HTTPS URL (use `ngrok http <port>`) - MeetStream will not retry non-2xx or unreachable webhooks |
 
 ## Development
 
