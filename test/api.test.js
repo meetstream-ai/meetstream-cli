@@ -1,4 +1,4 @@
-// Unit tests for the API client — mocked fetch, no network.
+// Unit tests for the API client - mocked fetch, no network.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MeetStreamClient, buildCreateBotPayload } from '../src/api.js';
@@ -114,4 +114,16 @@ test('live shape: transcript wrapped in message key is unwrapped', async () => {
   const c = new MeetStreamClient('K', { fetchImpl: f });
   const { transcript } = await c.getTranscript('b1');
   assert.equal(transcript[0].speaker, 'Sid');
+});
+
+test('buildCreateBotPayload: Zoom authenticated joins use zak_url / obf_url', () => {
+  const zak = buildCreateBotPayload({ meetingLink: 'https://zoom.us/j/1', zoomZakUrl: 'https://x.example/zak' });
+  assert.deepEqual(zak.zoom, { zak_url: 'https://x.example/zak' });
+  const obf = buildCreateBotPayload({ meetingLink: 'https://zoom.us/j/1', zoomObfUrl: 'https://x.example/obf' });
+  assert.deepEqual(obf.zoom, { obf_url: 'https://x.example/obf' });
+  assert.equal(buildCreateBotPayload({ meetingLink: 'https://zoom.us/j/1' }).zoom, undefined);
+});
+
+test('buildCreateBotPayload: the removed --zoom-obf flag fails loudly instead of sending use_zoom_obf', () => {
+  assert.throws(() => buildCreateBotPayload({ meetingLink: 'https://zoom.us/j/1', zoomObf: true }), /--zoom-obf-url/);
 });

@@ -26,10 +26,12 @@ export function registerBotCommands(program, getClient) {
     .option('--join-at <iso8601>', 'schedule a future join, e.g. 2026-07-02T15:00:00Z')
     .option('--bot-message <msg>', 'chat message posted when the bot joins')
     .option('--image-url <url>', 'PUBLIC image URL for the bot avatar')
-    .option('--retention-hours <n>', 'data retention window (default: API default 24h)')
+    .option('--retention-hours <n>', 'data retention window in hours (API default 720, i.e. 30 days)')
     .option('--separate-audio', 'capture per-participant audio streams')
     .option('--separate-video', 'capture per-participant video streams')
-    .option('--zoom-obf', 'use Zoom On-Behalf-Of')
+    .option('--zoom-zak-url <url>', 'Zoom: HTTPS endpoint on your server returning a ZAK token (join as a signed-in user)')
+    .option('--zoom-obf-url <url>', 'Zoom: HTTPS endpoint on your server returning an OBF token (join on behalf of a user in the meeting)')
+    .option('--zoom-obf', 'removed: use --zoom-obf-url')
     .option('--agent-config-id <id>', 'attach a MIA conversational agent')
     .option('--live-transcript-webhook <url>', 'webhook URL for live transcript chunks')
     .option('--live-audio-ws <wss>', 'WebSocket URL for live audio out')
@@ -58,6 +60,8 @@ export function registerBotCommands(program, getClient) {
           separateAudio: opts.separateAudio,
           separateVideo: opts.separateVideo,
           zoomObf: opts.zoomObf,
+          zoomZakUrl: opts.zoomZakUrl,
+          zoomObfUrl: opts.zoomObfUrl,
           agentConfigId: opts.agentConfigId,
           liveTranscriptWebhook: opts.liveTranscriptWebhook,
           liveAudioWs: opts.liveAudioWs,
@@ -70,7 +74,7 @@ export function registerBotCommands(program, getClient) {
         });
         const { status, data } = await client.createBot(payload, { idempotencyKey: opts.idempotencyKey });
         if (opts.json) return printJson(data);
-        ok(status === 507 ? 'Idempotent replay — existing bot returned (no new bot created)' : 'Bot created');
+        ok(status === 507 ? 'Idempotent replay - existing bot returned (no new bot created)' : 'Bot created');
         kv({ bot_id: bold(data.bot_id), transcript_id: data.transcript_id || dim('(pending)'), status: data.status, meeting: data.meeting_url });
         console.log(dim(`\n  Next: meetstream bot status ${data.bot_id} --watch`));
         if (payload.recording_config?.transcript) console.log(dim(`        meetstream transcript ${data.bot_id} --wait`));
@@ -139,7 +143,7 @@ export function registerBotCommands(program, getClient) {
       .action(async (botId, opts) => {
         try {
           const { data } = await getClient()[method](botId);
-          printJson(data); // structured data — JSON is the honest default
+          printJson(data); // structured data - JSON is the honest default
         } catch (e) { handleError(e, opts); }
       });
   }

@@ -1,4 +1,4 @@
-// Terminal output helpers — zero-dependency colors + consistent JSON mode.
+// Terminal output helpers - zero-dependency colors + consistent JSON mode.
 const tty = process.stdout.isTTY;
 const c = (code) => (s) => (tty ? `\x1b[${code}m${s}\x1b[0m` : String(s));
 export const bold = c('1');

@@ -90,10 +90,11 @@ meetstream transcript <bot_id> --wait
 --join-at <iso8601>              schedule a future join, e.g. 2026-07-02T15:00:00Z
 --bot-message <msg>              chat message posted when the bot joins
 --image-url <url>                PUBLIC image URL for the bot avatar
---retention-hours <n>            data retention window (API default 24h)
+--retention-hours <n>            data retention window in hours (API default 720, i.e. 30 days)
 --separate-audio                 capture per-participant audio streams
 --separate-video                 capture per-participant video streams
---zoom-obf                       use Zoom On-Behalf-Of
+--zoom-zak-url <url>             Zoom: HTTPS endpoint returning a ZAK token (signed-in join)
+--zoom-obf-url <url>             Zoom: HTTPS endpoint returning an OBF token (on-behalf-of join)
 --agent-config-id <id>           attach a MIA conversational agent
 --live-transcript-webhook <url>  webhook URL for live transcript chunks
 --live-audio-ws <wss>            WebSocket URL for live audio out
@@ -143,17 +144,17 @@ Every command supports `--json` for scripting.
 
 ## The webhook model - live-verified
 
-Events arrive under the **`event`** key with `bot_id`, `bot_status`, `message`, `status_code` (200/500), `custom_attributes` - this is exactly what `meetstream listen` decodes and pretty-prints for you:
+Every event carries **`event`**, `bot_id`, `message`, `status_code` (200/500), `custom_attributes` and `timestamp`, and most also carry **`bot_event`**. This is exactly what `meetstream listen` decodes and pretty-prints for you:
 
 ```
 bot.joining → bot.in_waiting_room → bot.inmeeting → bot.recording → bot.leaving → bot.stopped
 → manifest.completed → audio.processed → transcription.processed → video.processed → bot.done
 ```
 
-- **`bot.stopped` fires once** - `bot_status` says why (`Stopped` normal · `NotAllowed` lobby-timeout · `Denied` host-denied · `Error` crash).
-- **Streaming-only transcription providers** (`deepgram_streaming`, `assemblyai_streaming`, `meeting_captions`) end at `audio.processed` - they never fire `transcription.processed`, `transcription.failed`, or `bot.done`.
+- **Terminals are two-layer.** Every ending arrives once as `event: "bot.stopped"`, and `bot_event` says why: `bot.stopped` (normal), `bot.kicked` (removed by a participant), `bot.notallowed` (lobby timeout), `bot.denied` (host refused), `bot.failed` (crash). Not admitted, denied and failed carry `status_code: 500`. Branch on `bot_event`: a kick and a clean exit both report `bot_status: "Stopped"`.
+- **Streaming-only transcription providers** (`deepgram_streaming`, `assemblyai_streaming`, `meeting_captions`) never fire `transcription.processed` or `transcription.failed`. `bot.done` still fires, on every path.
 - **`transcript_id` is not in webhooks** - `meetstream transcript <bot_id>` resolves it via `/detail` automatically.
-- The public docs page for this describes a different (`bot_event`) envelope key - that's inaccurate; this CLI, and the [MeetStream MCP server](https://github.com/meetstream-ai/meetstream-mcp), both implement the live-verified model above.
+- The [MeetStream MCP server](https://github.com/meetstream-ai/meetstream-mcp)'s `webhook_events_guide` tool describes the same model.
 
 ---
 

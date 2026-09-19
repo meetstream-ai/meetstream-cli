@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// MeetStream CLI — https://github.com/meetstream-ai/meetstream-cli
+// MeetStream CLI - https://github.com/meetstream-ai/meetstream-cli
 import { Command } from 'commander';
 import { createRequire } from 'node:module';
 import { MeetStreamClient } from '../src/api.js';
@@ -17,7 +17,7 @@ const { version } = require('../package.json');
 const program = new Command();
 program
   .name('meetstream')
-  .description('MeetStream — meeting bot API from your terminal (Zoom, Google Meet, Teams)\nDocs: https://docs.meetstream.ai · Keys: https://app.meetstream.ai/api-keys')
+  .description('MeetStream - meeting bot API from your terminal (Zoom, Google Meet, Teams)\nDocs: https://docs.meetstream.ai · Keys: https://app.meetstream.ai/api-keys')
   .version(version);
 
 let client;
