@@ -165,6 +165,131 @@ export class MeetStreamClient {
   miaCreate(config) { return this.request('POST', '/mia', { body: config }); }
   miaUpdate(config) { return this.request('PUT', '/mia', { body: config }); }
   miaDelete(agentConfigId) { return this.request('DELETE', '/mia', { query: { agent_config_id: agentConfigId } }); }
+
+  // ── Signed-in bots: Microsoft Teams logins ────────────────────────────
+  // Passwords are write-only: sent in the request body, never returned, never logged.
+  teamsDomainsList() { return this.request('GET', '/teams-login-domains'); }
+  teamsDomainGet(domain) { return this.request('GET', `/teams-login-domains/${enc(domain)}`); }
+  teamsDomainCreate({ domain, name } = {}) {
+    // login_mode "if_required" is not supported for Teams yet; always use "always".
+    return this.request('POST', '/teams-login-domains', {
+      body: { domain, ...(name ? { name } : {}), login_mode: 'always' },
+    });
+  }
+  teamsDomainUpdate(domain, { name } = {}) {
+    return this.request('PATCH', `/teams-login-domains/${enc(domain)}`, { body: { ...(name ? { name } : {}) } });
+  }
+  teamsDomainDelete(domain) { return this.request('DELETE', `/teams-login-domains/${enc(domain)}`); }
+  teamsLoginsList(domain) { return this.request('GET', '/teams-logins', { query: { domain } }); }
+  teamsLoginGet(loginId) { return this.request('GET', `/teams-logins/${enc(loginId)}`); }
+  teamsLoginCreate({ domain, email, password, isActive } = {}) {
+    return this.request('POST', '/teams-logins', {
+      body: { domain, email, password, ...(isActive !== undefined ? { is_active: Boolean(isActive) } : {}) },
+    });
+  }
+  teamsLoginUpdate(loginId, { password, isActive } = {}) {
+    const body = {};
+    if (password !== undefined) body.password = password; // a new password also reactivates the account
+    if (isActive !== undefined) body.is_active = Boolean(isActive);
+    return this.request('PATCH', `/teams-logins/${enc(loginId)}`, { body });
+  }
+  teamsLoginDelete(loginId) { return this.request('DELETE', `/teams-logins/${enc(loginId)}`); }
+
+  // ── Signed-in bots: Google Meet logins ────────────────────────────────
+  // Google domains are keyed by sso_workspace_domain; logins authenticate with an
+  // SSO private key + certificate (PEM), not a password. There is no GET-by-id for
+  // a Google login, and PATCH/DELETE on a login need the domain.
+  googleDomainsList() { return this.request('GET', '/google-login-domains'); }
+  googleDomainGet(domain) { return this.request('GET', `/google-login-domains/${enc(domain)}`); }
+  googleDomainCreate({ domain, name, loginMode = 'always' } = {}) {
+    return this.request('POST', '/google-login-domains', {
+      body: { sso_workspace_domain: domain, ...(name ? { name } : {}), login_mode: loginMode },
+    });
+  }
+  googleDomainUpdate(domain, { name, loginMode } = {}) {
+    return this.request('PATCH', `/google-login-domains/${enc(domain)}`, {
+      body: { ...(name ? { name } : {}), ...(loginMode ? { login_mode: loginMode } : {}) },
+    });
+  }
+  googleDomainDelete(domain) { return this.request('DELETE', `/google-login-domains/${enc(domain)}`); }
+  googleLoginsList(domain) { return this.request('GET', '/google-logins', { query: { domain } }); }
+  googleLoginCreate({ domain, email, privateKeyPem, certPem, isActive } = {}) {
+    return this.request('POST', '/google-logins', {
+      body: {
+        domain, email, sso_private_key_pem: privateKeyPem, sso_cert_pem: certPem,
+        ...(isActive !== undefined ? { is_active: Boolean(isActive) } : {}),
+      },
+    });
+  }
+  googleLoginUpdate(loginId, { domain, isActive, privateKeyPem, certPem } = {}) {
+    const body = { domain };
+    if (isActive !== undefined) body.is_active = Boolean(isActive);
+    if (privateKeyPem !== undefined) body.sso_private_key_pem = privateKeyPem;
+    if (certPem !== undefined) body.sso_cert_pem = certPem;
+    return this.request('PATCH', `/google-logins/${enc(loginId)}`, { body });
+  }
+  googleLoginDelete(loginId, domain) {
+    return this.request('DELETE', `/google-logins/${enc(loginId)}`, { query: { domain } });
+  }
+}
+
+const enc = (s) => encodeURIComponent(String(s));
+
+const TEAMS_HOSTS = ['teams.microsoft.com', 'teams.live.com', 'teams.cloud.microsoft'];
+const GOOGLE_HOSTS = ['meet.google.com'];
+
+function linkHost(link) {
+  try { return new URL(String(link)).hostname.toLowerCase(); } catch { return ''; }
+}
+const hostIn = (host, list) => list.some((h) => host === h || host.endsWith(`.${h}`));
+
+function usageError(message) {
+  return Object.assign(new Error(message), { exitCode: 2 });
+}
+
+/**
+ * Validate the signed-in bot flags and build the `google_meet` / `teams` block.
+ * Returns { key, block } or null when no signed-in flag is set. Throws (exitCode 2) on misuse.
+ */
+export function buildSignedInBlock(opts = {}) {
+  const { googleLoginDomain, teamsLoginDomain, signInEmail, strictEmail } = opts;
+  if (googleLoginDomain && teamsLoginDomain) {
+    throw usageError('Use either --google-login-domain or --teams-login-domain, not both (one meeting, one platform).');
+  }
+  const domain = googleLoginDomain || teamsLoginDomain;
+  if (!domain) {
+    if (signInEmail) throw usageError('--sign-in-email needs --google-login-domain or --teams-login-domain.');
+    if (strictEmail === false) throw usageError('--no-strict-email only applies together with --sign-in-email and a login domain flag.');
+    return null;
+  }
+  if (strictEmail === false && !signInEmail) {
+    throw usageError('--no-strict-email only applies together with --sign-in-email.');
+  }
+  const isTeams = Boolean(teamsLoginDomain);
+  const block = { login_required: true, [isTeams ? 'teams_login_domain' : 'google_login_domain']: domain };
+  if (signInEmail) {
+    block.sign_in_email = signInEmail;
+    block.strict_email = strictEmail !== false; // API default is true; false = fall back to any free account
+  }
+  return { key: isTeams ? 'teams' : 'google_meet', block };
+}
+
+/** Non-fatal warnings for signed-in bot flags (printed to stderr; the request is still sent). */
+export function signedInWarnings(opts = {}) {
+  const warnings = [];
+  const host = linkHost(opts.meetingLink);
+  if (opts.teamsLoginDomain) {
+    if (!hostIn(host, TEAMS_HOSTS)) {
+      warnings.push(`--teams-login-domain is set but the meeting link host is "${host || opts.meetingLink}", not a Microsoft Teams host (teams.microsoft.com / teams.live.com). Sending anyway.`);
+    } else if (hostIn(host, ['teams.live.com'])) {
+      warnings.push('teams.live.com is personal Teams: signed-in bots only work with Microsoft 365 work/school Teams meetings.');
+    }
+    warnings.push('Signed-in Teams bots show the Microsoft account\'s own display name and picture; --name and --image-url are not applied.');
+  }
+  if (opts.googleLoginDomain && !hostIn(host, GOOGLE_HOSTS)) {
+    warnings.push(`--google-login-domain is set but the meeting link host is "${host || opts.meetingLink}", not meet.google.com. Sending anyway.`);
+  }
+  return warnings;
 }
 
 /** Build a create_bot payload from CLI-ish options, applying safe defaults. */
@@ -190,6 +315,9 @@ export function buildCreateBotPayload(opts) {
     if (opts.zoomZakUrl) payload.zoom.zak_url = opts.zoomZakUrl;
     if (opts.zoomObfUrl) payload.zoom.obf_url = opts.zoomObfUrl;
   }
+  // Signed-in bots: Google Meet (google_meet) or Microsoft Teams (teams) accounts registered via `meetstream logins`.
+  const signedIn = buildSignedInBlock(opts);
+  if (signedIn) payload[signedIn.key] = signedIn.block;
   if (opts.liveTranscriptWebhook) payload.live_transcription_required = { webhook_url: opts.liveTranscriptWebhook };
   if (opts.liveAudioWs) payload.live_audio_required = { websocket_url: opts.liveAudioWs };
   if (opts.liveVideoWs) payload.live_video_required = { websocket_url: opts.liveVideoWs };

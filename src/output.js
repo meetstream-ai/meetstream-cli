@@ -14,6 +14,8 @@ export function printJson(obj) {
 
 export function ok(msg) { console.log(green('✓ ') + msg); }
 export function warn(msg) { console.log(yellow('⚠ ') + msg); }
+/** Warning on stderr, so --json output on stdout stays parseable. */
+export function warnErr(msg) { console.error(yellow('⚠ ') + msg); }
 export function fail(msg) { console.error(red('✗ ') + msg); }
 
 export function kv(pairs) {

@@ -1,5 +1,5 @@
-import { buildCreateBotPayload } from '../api.js';
-import { printJson, ok, kv, bold, dim, cyan, transcriptToText, handleError } from '../output.js';
+import { buildCreateBotPayload, signedInWarnings } from '../api.js';
+import { printJson, ok, kv, bold, dim, cyan, transcriptToText, handleError, warnErr } from '../output.js';
 
 function parseAttrs(list = []) {
   const out = {};
@@ -32,6 +32,10 @@ export function registerBotCommands(program, getClient) {
     .option('--zoom-zak-url <url>', 'Zoom: HTTPS endpoint on your server returning a ZAK token (join as a signed-in user)')
     .option('--zoom-obf-url <url>', 'Zoom: HTTPS endpoint on your server returning an OBF token (join on behalf of a user in the meeting)')
     .option('--zoom-obf', 'removed: use --zoom-obf-url')
+    .option('--google-login-domain <domain>', 'Google Meet: join signed in with an account from this registered Workspace domain (see: meetstream logins google)')
+    .option('--teams-login-domain <domain>', 'Teams: join signed in with an account from this registered Microsoft 365 domain (see: meetstream logins teams)')
+    .option('--sign-in-email <email>', 'signed-in bots: pin one registered account (needs a login domain flag)')
+    .option('--no-strict-email', 'with --sign-in-email: fall back to any free account in the domain instead of failing')
     .option('--agent-config-id <id>', 'attach a MIA conversational agent')
     .option('--live-transcript-webhook <url>', 'webhook URL for live transcript chunks')
     .option('--live-audio-ws <wss>', 'WebSocket URL for live audio out')
@@ -45,7 +49,6 @@ export function registerBotCommands(program, getClient) {
     .option('--json', 'JSON output')
     .action(async (meetingLink, opts) => {
       try {
-        const client = getClient();
         const payload = buildCreateBotPayload({
           meetingLink,
           name: opts.name,
@@ -62,6 +65,10 @@ export function registerBotCommands(program, getClient) {
           zoomObf: opts.zoomObf,
           zoomZakUrl: opts.zoomZakUrl,
           zoomObfUrl: opts.zoomObfUrl,
+          googleLoginDomain: opts.googleLoginDomain,
+          teamsLoginDomain: opts.teamsLoginDomain,
+          signInEmail: opts.signInEmail,
+          strictEmail: opts.strictEmail,
           agentConfigId: opts.agentConfigId,
           liveTranscriptWebhook: opts.liveTranscriptWebhook,
           liveAudioWs: opts.liveAudioWs,
@@ -72,7 +79,8 @@ export function registerBotCommands(program, getClient) {
           waitingRoomTimeout: opts.waitingRoomTimeout,
           maxRecordingSeconds: opts.maxRecordingSeconds,
         });
-        const { status, data } = await client.createBot(payload, { idempotencyKey: opts.idempotencyKey });
+        for (const w of signedInWarnings({ meetingLink, googleLoginDomain: opts.googleLoginDomain, teamsLoginDomain: opts.teamsLoginDomain })) warnErr(w);
+        const { status, data } = await getClient().createBot(payload, { idempotencyKey: opts.idempotencyKey });
         if (opts.json) return printJson(data);
         ok(status === 507 ? 'Idempotent replay - existing bot returned (no new bot created)' : 'Bot created');
         kv({ bot_id: bold(data.bot_id), transcript_id: data.transcript_id || dim('(pending)'), status: data.status, meeting: data.meeting_url });

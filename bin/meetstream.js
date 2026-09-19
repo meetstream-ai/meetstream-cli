@@ -9,6 +9,7 @@ import { registerBotCommands } from '../src/commands/bot.js';
 import { registerTranscriptCommands } from '../src/commands/transcript.js';
 import { registerAuthCommands, registerCalendarCommands, registerMiaCommands } from '../src/commands/misc.js';
 import { registerListenCommand } from '../src/commands/listen.js';
+import { registerLoginsCommands } from '../src/commands/logins.js';
 import { track, shutdownTelemetry } from '../src/telemetry.js';
 
 const require = createRequire(import.meta.url);
@@ -31,6 +32,7 @@ registerBotCommands(program, getClient);
 registerTranscriptCommands(program, getClient);
 registerCalendarCommands(program, getClient);
 registerMiaCommands(program, getClient);
+registerLoginsCommands(program, getClient);
 registerListenCommand(program);
 
 program.hook('preAction', (thisCmd, actionCmd) => {

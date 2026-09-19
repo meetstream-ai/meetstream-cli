@@ -95,6 +95,14 @@ meetstream transcript <bot_id> --wait
 --separate-video                 capture per-participant video streams
 --zoom-zak-url <url>             Zoom: HTTPS endpoint returning a ZAK token (signed-in join)
 --zoom-obf-url <url>             Zoom: HTTPS endpoint returning an OBF token (on-behalf-of join)
+--google-login-domain <domain>   Google Meet: join signed in with an account from this
+                                   registered Workspace domain (see `logins google`)
+--teams-login-domain <domain>    Teams: join signed in with an account from this
+                                   registered Microsoft 365 domain (see `logins teams`)
+--sign-in-email <email>          signed-in bots: pin one registered account
+                                   (requires a login domain flag)
+--no-strict-email                with --sign-in-email: fall back to any free account
+                                   in the domain instead of failing (API default: strict)
 --agent-config-id <id>           attach a MIA conversational agent
 --live-transcript-webhook <url>  webhook URL for live transcript chunks
 --live-audio-ws <wss>            WebSocket URL for live audio out
@@ -106,6 +114,40 @@ meetstream transcript <bot_id> --wait
 --everyone-left-timeout <sec>    leave after everyone else leaves (default 60)
 --waiting-room-timeout <sec>     max seconds in waiting room (default 300)
 --max-recording-seconds <sec>    max in-call recording seconds (default 14400)
+```
+
+**Signed-in bots.** `--google-login-domain` / `--teams-login-domain` send the `google_meet` / `teams` block (`login_required: true` plus the domain, and `sign_in_email` / `strict_email` when you pin an account). Pass one domain flag, not both. The CLI warns on stderr (and still sends) if the meeting link host doesn't match the platform. Signed-in Teams bots show the Microsoft account's own name and picture, so `--name` / `--image-url` are not applied.
+
+```bash
+meetstream bot create "https://teams.microsoft.com/l/meetup-join/..." --teams-login-domain bots.example.com
+meetstream bot create "https://meet.google.com/abc-defg-hij" --google-login-domain example.com \
+  --sign-in-email notetaker@example.com --no-strict-email
+```
+
+### `logins` - accounts for signed-in bots
+Register the domain once, then the accounts bots sign in as. Setup guides: [Teams](https://docs.meetstream.ai/guides/app-integrations/teams-signed-in-bots) · [Google](https://docs.meetstream.ai/guides/app-integrations/google-signed-in-bots).
+
+| Command | What it does |
+|---------|---------------|
+| `logins teams domains` / `logins teams domain <domain>` | List domains / show one domain with its accounts |
+| `logins teams add-domain <domain> [--name <n>]` | Register a Microsoft 365 bot tenant domain (`login_mode` is always `always`) |
+| `logins teams update-domain <domain> --name <n>` | Rename a domain |
+| `logins teams remove-domain <domain> [--yes]` | Delete a domain **and all its accounts** (asks to confirm unless `--yes`) |
+| `logins teams list --domain <d>` / `logins teams get <login-id>` | List accounts in a domain / show one account (lease status, last session result) |
+| `logins teams add --domain <d> --email <e> [--password-stdin]` | Register an account. Teams runs **one bot per account at a time**: register N accounts for N concurrent bots |
+| `logins teams set-password <login-id> [--password-stdin]` | Rotate the password (also reactivates an account disabled after a failed sign-in) |
+| `logins teams disable\|enable <login-id>` | Take an account out of / back into rotation |
+| `logins teams remove <login-id> [--yes]` | Delete an account |
+| `logins google domains` / `domain` / `add-domain` / `update-domain` / `remove-domain` | Same as Teams, for Google Workspace domains (`add-domain` and `update-domain` also take `--login-mode always\|if_required`) |
+| `logins google list --domain <d>` | List accounts in a domain |
+| `logins google add --domain <d> --email <e> --key key.pem --cert cert.pem` | Register an account with the SSO private key + certificate from the setup guide (Google accounts use SSO, not passwords) |
+| `logins google set-cert <login-id> --domain <d> --key <pem> --cert <pem>` | Replace an account's SSO key + certificate |
+| `logins google disable\|enable\|remove <login-id> --domain <d>` | Same as Teams; Google needs the account's domain |
+
+**Passwords are never CLI arguments** (they would land in shell history). The CLI reads them from `--password-stdin`, else `MEETSTREAM_LOGIN_PASSWORD`, else a hidden prompt, and never prints them. The API treats them as write-only.
+```bash
+printf '%s' "$BOT_PASSWORD" | meetstream logins teams add --domain bots.example.com \
+  --email bot1@bots.example.com --password-stdin
 ```
 
 ### `transcript` / `transcriptions` / `transcribe` - transcription
@@ -173,6 +215,8 @@ bot.joining → bot.in_waiting_room → bot.inmeeting → bot.recording → bot.
 | "No API key found" | Run `meetstream auth set-key <key>` or `export MEETSTREAM_API_KEY=...` |
 | `auth status` fails with 401 | Key is invalid/revoked - generate a new one at [app.meetstream.ai/api-keys](https://app.meetstream.ai/api-keys) |
 | `transcript` returns "not ready yet" | The meeting isn't fully processed, or the provider is streaming-only (no post-call transcript) - check `bot status` first |
+| `bot create` with a login domain fails with 400 "not registered" | Register the domain first: `meetstream logins teams add-domain <domain>` (or `logins google add-domain`) |
+| Signed-in Teams bot fails with 409 / 429 | The pinned account is busy or deactivated, or every account is in use. Add accounts (`logins teams add`), rotate a password (`set-password`), or use `--no-strict-email` |
 | `listen` events never arrive | Confirm the bot's `--callback` URL is a public HTTPS URL (use `ngrok http <port>`) - MeetStream will not retry non-2xx or unreachable webhooks |
 
 ## Development

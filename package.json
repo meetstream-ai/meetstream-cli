@@ -1,7 +1,7 @@
 {
   "name": "@meetstream/cli",
-  "version": "0.3.0",
-  "description": "Official MeetStream CLI \u2014 create meeting bots, fetch transcripts, and stream webhook events from your terminal. Zoom, Google Meet, Microsoft Teams.",
+  "version": "0.4.0",
+  "description": "Official MeetStream CLI: create meeting bots, fetch transcripts, and stream webhook events from your terminal. Zoom, Google Meet, Microsoft Teams, including signed-in bots.",
   "type": "module",
   "bin": {
     "meetstream": "bin/meetstream.js"
