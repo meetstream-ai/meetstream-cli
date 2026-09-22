@@ -262,3 +262,22 @@ test('resolvePassword: --password-stdin, then env var, then TTY prompt; refuses 
   await assert.rejects(() => resolvePassword({ env: {}, isTTY: false, read: never, prompt: never }), (e) => e.exitCode === 2 && /--password-stdin/.test(e.message));
   await assert.rejects(() => resolvePassword({ passwordStdin: true, read: async () => '', env: {} }), /empty/);
 });
+
+test('buildCreateBotPayload: audio only by default, speaker view when --video is set', () => {
+  const audio = buildCreateBotPayload({ meetingLink: 'https://meet.google.com/x' });
+  assert.equal(audio.video_required, false);
+  assert.equal(audio.recording_config?.video_layout, undefined);
+  assert.equal(audio.video_separate_streams, undefined);
+
+  const video = buildCreateBotPayload({ meetingLink: 'https://meet.google.com/x', video: true });
+  assert.equal(video.recording_config.video_layout, 'speaker_view'); // API default is grid_view
+  assert.equal(video.video_separate_streams, undefined);             // per-participant video stays opt-in
+
+  const grid = buildCreateBotPayload({ meetingLink: 'https://meet.google.com/x', video: true, videoLayout: 'grid_view' });
+  assert.equal(grid.recording_config.video_layout, 'grid_view');
+});
+
+test('buildCreateBotPayload: --video-layout is validated and needs --video', () => {
+  assert.throws(() => buildCreateBotPayload({ meetingLink: 'm', videoLayout: 'speaker_view' }), /needs --video/);
+  assert.throws(() => buildCreateBotPayload({ meetingLink: 'm', video: true, videoLayout: 'gallery' }), /speaker_view or grid_view/);
+});

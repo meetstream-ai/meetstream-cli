@@ -305,7 +305,21 @@ export function buildCreateBotPayload(opts) {
   if (opts.joinAt) payload.join_at = opts.joinAt;
   if (opts.agentConfigId) payload.agent_config_id = opts.agentConfigId;
   if (opts.separateAudio) payload.audio_separate_streams = true;
+  // Per-participant video is opt-in only: never set implicitly.
   if (opts.separateVideo) payload.video_separate_streams = true;
+
+  // Audio only unless --video; with --video, speaker view unless --video-layout grid_view
+  // (the REST API defaults to grid_view, so the layout is always sent explicitly).
+  // video_layout applies to mixed video only, so audio-only bots never carry it.
+  if (payload.video_required) {
+    const layout = String(opts.videoLayout || 'speaker_view').toLowerCase();
+    if (!['speaker_view', 'grid_view'].includes(layout)) {
+      throw usageError("--video-layout must be speaker_view or grid_view.");
+    }
+    payload.recording_config = { ...(payload.recording_config || {}), video_layout: layout };
+  } else if (opts.videoLayout) {
+    throw usageError('--video-layout needs --video (an audio-only bot records no mixed video).');
+  }
   if (opts.zoomObf) {
     throw new Error('--zoom-obf was removed: the API rejects use_zoom_obf. Use --zoom-obf-url <https-url> or --zoom-zak-url <https-url>.');
   }

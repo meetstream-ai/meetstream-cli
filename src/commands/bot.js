@@ -19,7 +19,8 @@ export function registerBotCommands(program, getClient) {
     .description('Send a bot to a meeting (or schedule with --join-at)')
     .argument('<meeting-link>', 'Zoom / Google Meet / Teams meeting URL')
     .option('-n, --name <name>', 'bot display name', 'MeetStream Bot')
-    .option('--video', 'record video (default: audio only)')
+    .option('--video', 'record video as well as audio (default: audio only)')
+    .option('--video-layout <layout>', 'with --video: speaker_view (default) or grid_view')
     .option('-t, --transcript <provider>', 'deepgram | assemblyai | sarvam | meetstream | jigsawstack | meeting_captions | deepgram_streaming | assemblyai_streaming')
     .option('-l, --language <lang>', 'transcription language (provider-specific format)')
     .option('-c, --callback <url>', 'HTTPS webhook for lifecycle events')
@@ -28,7 +29,7 @@ export function registerBotCommands(program, getClient) {
     .option('--image-url <url>', 'PUBLIC image URL for the bot avatar')
     .option('--retention-hours <n>', 'data retention window in hours (API default 720, i.e. 30 days)')
     .option('--separate-audio', 'capture per-participant audio streams')
-    .option('--separate-video', 'capture per-participant video streams')
+    .option('--separate-video', 'capture per-participant video streams (opt-in; off unless you pass this)')
     .option('--zoom-zak-url <url>', 'Zoom: HTTPS endpoint on your server returning a ZAK token (join as a signed-in user)')
     .option('--zoom-obf-url <url>', 'Zoom: HTTPS endpoint on your server returning an OBF token (join on behalf of a user in the meeting)')
     .option('--zoom-obf', 'removed: use --zoom-obf-url')
@@ -53,6 +54,7 @@ export function registerBotCommands(program, getClient) {
           meetingLink,
           name: opts.name,
           video: opts.video,
+          videoLayout: opts.videoLayout,
           transcript: opts.transcript,
           language: opts.language,
           callback: opts.callback,

@@ -81,7 +81,8 @@ meetstream transcript <bot_id> --wait
 **`bot create` options:**
 ```
 -n, --name <name>                bot display name (default "MeetStream Bot")
---video                           record video (default: audio only)
+--video                           record video as well as audio (default: audio only)
+--video-layout <layout>           with --video: speaker_view (default) or grid_view
 -t, --transcript <provider>      deepgram | assemblyai | sarvam | meetstream |
                                    jigsawstack | meeting_captions |
                                    deepgram_streaming | assemblyai_streaming
