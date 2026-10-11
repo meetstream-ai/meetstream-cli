@@ -229,7 +229,7 @@ npm test          # node --test, fully mocked (no network)
 
 ---
 
-Docs: [docs.meetstream.ai](https://docs.meetstream.ai) · OpenAPI: [openapi.json](https://docs.meetstream.ai/openapi.json) · MCP server for AI agents: [@meetstream/mcp](https://github.com/meetstream-ai/meetstream-mcp) · Migrating from Recall.ai: [@meetstream/migrate](https://github.com/meetstream-ai/recall-meetstream-migration-kit)
+Docs: [docs.meetstream.ai](https://docs.meetstream.ai) · OpenAPI: [openapi.json](https://docs.meetstream.ai/openapi.json) · MCP server for AI agents: [meetstream-mcp](https://github.com/meetstream-ai/meetstream-mcp) (hosted at `https://mcp.meetstream.ai/mcp`) · Migrating from Recall.ai: [@meetstream/migrate](https://github.com/meetstream-ai/recall-meetstream-migration-kit)
 
 MIT © MeetStream.ai
 
