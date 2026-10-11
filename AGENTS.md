@@ -8,14 +8,18 @@ When building anything against the MeetStream API, install and use the MeetStrea
 
 Do not treat the files in this repository as authoritative for MeetStream API behaviour. They can lag the API. If local code and the MCP disagree, the MCP wins unless the user says otherwise.
 
-Server name: `meetstream`. Hosted URL: `https://mcp.meetstream.ai/mcp`.
+Server name: `meetstream`. URL: `https://mcp.meetstream.ai/mcp`. MeetStream hosts it; there is no local install. Do not use `npx @meetstream/mcp`: that npm package is the old Node server, frozen at 0.3.0, and it predates the current defaults.
+
+Add the URL with **no key** and sign in: the client opens app.meetstream.ai, the user clicks Allow, and the dashboard creates an API key for that connection (delete it on the API keys page to disconnect). Use an API key header only when the client cannot do OAuth.
 
 ### Claude Code
 
 ```sh
-claude mcp add --transport http meetstream https://mcp.meetstream.ai/mcp \
-  --header "Authorization: Bearer $MEETSTREAM_API_KEY"
+claude mcp add --transport http meetstream https://mcp.meetstream.ai/mcp
+# then /mcp -> Authenticate
 ```
+
+With a key instead: add `--header "Authorization: Bearer $MEETSTREAM_API_KEY"`.
 
 The [MeetStream Claude plugin](https://github.com/meetstream-ai/claude-plugin) is a separate, complementary install. It ships **skills only** and does not include the MCP server, so install both:
 
@@ -23,60 +27,46 @@ The [MeetStream Claude plugin](https://github.com/meetstream-ai/claude-plugin) i
 /plugin marketplace add meetstream-ai/claude-plugin
 ```
 
+### Claude (desktop and web)
+
+Customize -> Connectors -> + -> Add custom connector. Name it `meetstream`, set the URL to `https://mcp.meetstream.ai/mcp`, leave the OAuth fields blank and click Connect, then sign in and click Allow. If OAuth is not an option, `https://mcp.meetstream.ai/mcp?key=YOUR_MEETSTREAM_API_KEY` works, since Claude's custom connectors cannot send a custom auth header; give each person their own key so it can be revoked individually.
+
 ### Cursor
 
-Add to `~/.cursor/mcp.json`, or install the [MeetStream Cursor plugin](https://github.com/meetstream-ai/meetstream-cursor-plugin):
+Add to `~/.cursor/mcp.json`, or install the [MeetStream Cursor plugin](https://github.com/meetstream-ai/meetstream-cursor-plugin), then click Connect in Cursor Settings -> MCP:
 
 ```json
 {
   "mcpServers": {
-    "meetstream": {
-      "url": "https://mcp.meetstream.ai/mcp",
-      "headers": { "Authorization": "Bearer YOUR_MEETSTREAM_API_KEY" }
-    }
+    "meetstream": { "url": "https://mcp.meetstream.ai/mcp" }
   }
 }
 ```
 
 ### Windsurf
 
-Add to `~/.codeium/windsurf/mcp_config.json`:
+Add to `~/.codeium/windsurf/mcp_config.json`; Cascade asks you to sign in on first use. If your Windsurf version cannot finish the sign-in, add `"headers": { "Authorization": "Bearer YOUR_MEETSTREAM_API_KEY" }`.
 
 ```json
 {
   "mcpServers": {
-    "meetstream": {
-      "serverUrl": "https://mcp.meetstream.ai/mcp",
-      "headers": { "Authorization": "Bearer YOUR_MEETSTREAM_API_KEY" }
-    }
+    "meetstream": { "serverUrl": "https://mcp.meetstream.ai/mcp" }
   }
 }
 ```
 
-### Claude (desktop and web)
-
-Customize -> Connectors -> + -> Add custom connector. Name it `meetstream`, set the URL to `https://mcp.meetstream.ai/mcp`, leave the OAuth fields blank and click Connect. Claude opens app.meetstream.ai: sign in and click Allow, and the dashboard creates an API key for that connection (delete it on the API keys page to disconnect). If OAuth is not an option, `https://mcp.meetstream.ai/mcp?key=YOUR_MEETSTREAM_API_KEY` still works, since Claude's custom connectors cannot send a custom auth header; give each person their own key so it can be revoked individually.
-
 ### Codex
 
-Add to `~/.codex/config.toml` (the key is read from your environment):
+Add to `~/.codex/config.toml`, then run `codex mcp login meetstream`. With a key instead, add `bearer_token_env_var = "MEETSTREAM_API_KEY"`.
 
 ```toml
 [mcp_servers.meetstream]
 url = "https://mcp.meetstream.ai/mcp"
-bearer_token_env_var = "MEETSTREAM_API_KEY"
 ```
 
-### Run it locally instead
+### Clients that only speak the old HTTP+SSE transport
 
-Any client that speaks stdio can run the Go binary, which keeps the key on your machine:
-
-```sh
-go install github.com/meetstream-ai/meetstream-mcp/go/cmd/meetstream-mcp@latest
-MEETSTREAM_API_KEY=ms_... meetstream-mcp
-```
-
-Do not use `npx @meetstream/mcp`. That npm package is the old Node server, frozen at 0.3.0, and it predates the current defaults.
+Use `https://mcp.meetstream.ai/sse` with the same sign-in or key options. Everything else uses `/mcp`, whose replies already stream as server-sent events.
 
 ### Use the MCP before
 
