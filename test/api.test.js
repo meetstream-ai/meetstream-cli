@@ -367,3 +367,10 @@ test('buildCreateBotPayload: zoom use_own_app, storage_id, smallest providers, d
     assert.equal(buildCreateBotPayload({ meetingLink: 'https://meet.google.com/x', video: true, videoLayout: l }).recording_config.video_layout, l);
   }
 });
+
+test('calendar list uses GET /calendar/calendars', async () => {
+  const f = mockFetch([['/calendar/calendars', { body: { calendars: [] } }]]);
+  await new MeetStreamClient('K', { fetchImpl: f }).listCalendars();
+  assert.equal(f.calls[0].init.method, 'GET');
+  assert.match(f.calls[0].url, /\/api\/v1\/calendar\/calendars$/);
+});

@@ -180,7 +180,7 @@ export class MeetStreamClient {
       body: { google_client_id: clientId, google_client_secret: clientSecret, google_refresh_token: refreshToken },
     });
   }
-  listCalendars() { return this.request('GET', '/calendar'); }
+  listCalendars() { return this.request('GET', '/calendar/calendars'); }
   calendarEvents() { return this.request('GET', '/calendar/events'); }
   scheduleEvent(eventId) { return this.request('POST', `/calendar/schedule/${eventId}`); }
   unscheduleEvent(eventId) { return this.request('DELETE', `/calendar/schedule/${eventId}`); }

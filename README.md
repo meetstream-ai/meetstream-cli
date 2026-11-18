@@ -116,7 +116,8 @@ meetstream transcript <bot_id> --wait
 --agent-config-id <id>           attach a MIA conversational agent
 --live-transcript-webhook <url>  webhook URL for live transcript chunks
 --live-audio-ws <wss>            WebSocket URL for live audio out
---live-video-ws <wss>            WebSocket URL for live video out
+--live-video-ws <wss>            reserved: accepted by the API, but live video
+                                   is not delivered yet
 --socket-ws <wss>                two-way bot-control WebSocket (socket_connection_url)
 --attr <key=value...>            custom_attributes entries (echoed back in webhooks)
 --idempotency-key <uuid>         safe-retry key - a retry returns the original

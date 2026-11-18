@@ -43,7 +43,7 @@ export function registerBotCommands(program, getClient) {
     .option('--agent-config-id <id>', 'attach a MIA conversational agent')
     .option('--live-transcript-webhook <url>', 'webhook URL for live transcript chunks')
     .option('--live-audio-ws <wss>', 'WebSocket URL for live audio out')
-    .option('--live-video-ws <wss>', 'WebSocket URL for live video out')
+    .option('--live-video-ws <wss>', 'reserved: the API accepts live_video_required.websocket_url but does not deliver live video yet')
     .option('--socket-ws <wss>', 'two-way bot-control WebSocket (socket_connection_url)')
     .option('--attr <key=value...>', 'custom_attributes entries (echoed back in webhooks)')
     .option('--idempotency-key <uuid>', 'safe-retry key (retry returns HTTP 507 with the original bot)')
