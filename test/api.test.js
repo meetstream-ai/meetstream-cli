@@ -281,3 +281,89 @@ test('buildCreateBotPayload: --video-layout is validated and needs --video', () 
   assert.throws(() => buildCreateBotPayload({ meetingLink: 'm', videoLayout: 'speaker_view' }), /needs --video/);
   assert.throws(() => buildCreateBotPayload({ meetingLink: 'm', video: true, videoLayout: 'gallery' }), /speaker_view or grid_view/);
 });
+
+// ── API v1.9.0 sync (MS-2274) ─────────────────────────────────────────────
+
+function mockFetchWithHeaders(status, body, headers = {}) {
+  const calls = [];
+  const fn = async (url, init) => {
+    calls.push({ url, init });
+    const h = Object.fromEntries(Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v]));
+    return {
+      ok: status < 400, status,
+      headers: { get: (k) => h[k.toLowerCase()] ?? null },
+      text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
+    };
+  };
+  fn.calls = calls;
+  return fn;
+}
+
+test('raise/lower hand POST send_command with only the command in the body', async () => {
+  const f = mockFetch([['/send_command', { body: { status: 'accepted', command: 'raise_hand', hand_raised: true } }]]);
+  const c = new MeetStreamClient('K', { fetchImpl: f });
+  const { data } = await c.raiseHand('b1');
+  assert.equal(data.hand_raised, true);
+  await c.lowerHand('b1');
+  assert.equal(f.calls[0].init.method, 'POST');
+  assert.match(f.calls[0].url, /\/bots\/b1\/send_command$/);
+  assert.deepEqual(JSON.parse(f.calls[0].init.body), { command: 'raise_hand' });
+  assert.deepEqual(JSON.parse(f.calls[1].init.body), { command: 'lower_hand' });
+});
+
+test('429 carries Retry-After in the message and on the error; {"message"} body is used', async () => {
+  const f = mockFetchWithHeaders(429, { error: 'rate_limit_exceeded', message: 'Too many bots created this minute.', retry_after: 37 }, { 'Retry-After': '37' });
+  const c = new MeetStreamClient('K', { fetchImpl: f });
+  await assert.rejects(() => c.createBot({ meeting_link: 'x' }), (e) =>
+    e.status === 429 && e.retryAfter === 37 && /HTTP 429: Too many bots created this minute\. \(retry after 37 s\)$/.test(e.message));
+});
+
+test('error bodies: message, then error, then a bare string; no Retry-After means no suffix', async () => {
+  for (const [body, want] of [
+    [{ message: 'Bot is not currently in a meeting.' }, /HTTP 409: Bot is not currently in a meeting\.$/],
+    [{ error: 'Bot not found' }, /HTTP 409: Bot not found$/],
+    ['Manifest file not found.', /HTTP 409: Manifest file not found\.$/],
+  ]) {
+    const c = new MeetStreamClient('K', { fetchImpl: mockFetchWithHeaders(409, body) });
+    await assert.rejects(() => c.raiseHand('b1'), (e) => want.test(e.message) && e.retryAfter === undefined);
+  }
+});
+
+test('speaker timeline download URL is fetched without the API key', async () => {
+  const f = mockFetch([
+    ['/get_speaker_timeline', { body: { bot_id: 'b1', speaker_timeline_url: 'https://s3.example/t.json?sig=1', size_bytes: 8421337, truncated: false } }],
+    ['s3.example', { body: [{ speaker: 'A', start: 0, end: 1 }] }],
+  ]);
+  const c = new MeetStreamClient('K', { fetchImpl: f });
+  const { data } = await c.speakerTimeline('b1');
+  const timeline = await c.downloadSpeakerTimeline(data.speaker_timeline_url);
+  assert.equal(timeline[0].speaker, 'A');
+  assert.equal(f.calls[1].url, 'https://s3.example/t.json?sig=1');
+  assert.equal(f.calls[1].init.headers, undefined); // no Authorization sent to S3
+});
+
+test('screenshots use the /screenshots route', async () => {
+  const f = mockFetch([['/screenshots', { body: { screenshots: [] } }]]);
+  await new MeetStreamClient('K', { fetchImpl: f }).screenshots('b1');
+  assert.match(f.calls[0].url, /\/bots\/b1\/screenshots$/);
+});
+
+test('buildCreateBotPayload: zoom use_own_app, storage_id, smallest providers, default layouts', () => {
+  assert.equal(buildCreateBotPayload({ meetingLink: 'https://zoom.us/j/1' }).zoom, undefined);
+  assert.deepEqual(buildCreateBotPayload({ meetingLink: 'https://zoom.us/j/1', zoomUseOwnApp: false }).zoom, { use_own_app: false });
+  assert.deepEqual(buildCreateBotPayload({ meetingLink: 'https://zoom.us/j/1', zoomUseOwnApp: true, zoomZakUrl: 'https://x/zak' }).zoom, { zak_url: 'https://x/zak', use_own_app: true });
+  assert.throws(() => buildCreateBotPayload({ meetingLink: 'm', zoomUseOwnApp: false, zoomObfUrl: 'https://x/obf' }), (e) => e.exitCode === 2 && /own Zoom app/.test(e.message));
+
+  assert.equal(buildCreateBotPayload({ meetingLink: 'm', storageId: 'eu-bucket_1' }).storage_id, 'eu-bucket_1');
+  assert.equal(buildCreateBotPayload({ meetingLink: 'm' }).storage_id, undefined);
+  assert.throws(() => buildCreateBotPayload({ meetingLink: 'm', storageId: 'bad id!' }), (e) => e.exitCode === 2 && /--storage-id/.test(e.message));
+
+  assert.deepEqual(buildCreateBotPayload({ meetingLink: 'm', transcript: 'smallest' }).recording_config.transcript.provider,
+    { smallest: { model: 'pulse', language: 'en', diarize: true } });
+  assert.deepEqual(buildCreateBotPayload({ meetingLink: 'm', transcript: 'smallest_streaming', language: 'hi' }).recording_config.transcript.provider,
+    { smallest_streaming: { model: 'pulse', language: 'hi' } });
+
+  for (const l of ['speaker_view_default', 'grid_view_default']) {
+    assert.equal(buildCreateBotPayload({ meetingLink: 'https://meet.google.com/x', video: true, videoLayout: l }).recording_config.video_layout, l);
+  }
+});

@@ -37,10 +37,13 @@ export function transcriptToText(segments) {
 
 export function handleError(err, { json = false } = {}) {
   if (json) {
-    printJson({ error: err.message, status: err.status, body: err.body });
+    printJson({ error: err.message, status: err.status, body: err.body, ...(err.retryAfter !== undefined ? { retry_after: err.retryAfter } : {}) });
   } else {
     fail(err.message);
     if (err.status === 401) console.error(dim('  Check your API key: https://app.meetstream.ai/api-keys'));
+    if (err.status === 429 && err.retryAfter !== undefined) {
+      console.error(dim(`  Rate limited. Wait ${err.retryAfter} s, then run the command again (reuse the same --idempotency-key).`));
+    }
   }
   process.exit(err.exitCode || 1);
 }

@@ -3,13 +3,33 @@
 import { BASE_URL } from './config.js';
 
 export class ApiError extends Error {
-  constructor(message, { status, body, path } = {}) {
+  constructor(message, { status, body, path, retryAfter } = {}) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.body = body;
     this.path = path;
+    // Seconds from the Retry-After header (429 rate limit, 409 while an
+    // idempotent create is still saving). undefined when the API sent none.
+    this.retryAfter = retryAfter;
   }
+}
+
+/** Error text from a response body: message, then detail, then error, then a bare string. */
+export function errorDetail(data) {
+  if (typeof data === 'object' && data !== null) {
+    return data.message || data.detail || data.error || JSON.stringify(data);
+  }
+  return String(data).slice(0, 300);
+}
+
+function retryAfterSeconds(res) {
+  const v = res.headers?.get?.('retry-after');
+  if (v == null || String(v).trim() === '') return undefined;
+  const n = Number(v);
+  if (Number.isFinite(n)) return Math.max(0, Math.ceil(n));
+  const when = Date.parse(v); // HTTP-date form
+  return Number.isNaN(when) ? undefined : Math.max(0, Math.ceil((when - Date.now()) / 1000));
 }
 
 export class MeetStreamClient {
@@ -39,11 +59,10 @@ export class MeetStreamClient {
     try { data = text ? JSON.parse(text) : null; } catch { data = text; }
     // 507 = idempotent replay of an existing bot - a success, not an error.
     if (!res.ok && res.status !== 507) {
-      const detail = typeof data === 'object' && data !== null
-        ? (data.detail || data.message || data.error || JSON.stringify(data))
-        : String(data).slice(0, 300);
-      throw new ApiError(`${method} ${path} → HTTP ${res.status}: ${detail}`, {
-        status: res.status, body: data, path,
+      const retryAfter = retryAfterSeconds(res);
+      const suffix = retryAfter !== undefined ? ` (retry after ${retryAfter} s)` : '';
+      throw new ApiError(`${method} ${path} → HTTP ${res.status}: ${errorDetail(data)}${suffix}`, {
+        status: res.status, body: data, path, retryAfter,
       });
     }
     return { status: res.status, data };
@@ -57,14 +76,26 @@ export class MeetStreamClient {
   listBots() { return this.request('GET', '/bots'); }
   botStatus(botId) { return this.request('GET', `/bots/${botId}/status`); }
   botDetail(botId) { return this.request('GET', `/bots/${botId}/detail`); }
-  botSummary(botId) { return this.request('GET', `/bots/${botId}/summary`); }
   botAudio(botId) { return this.request('GET', `/bots/${botId}/get_audio`); }
   botVideo(botId) { return this.request('GET', `/bots/${botId}/get_video`); }
   recordingStreams(botId) { return this.request('GET', `/bots/${botId}/get_recording_streams`); }
   audioStreams(botId) { return this.request('GET', `/bots/${botId}/get_audio_streams`); }
   speakerTimeline(botId) { return this.request('GET', `/bots/${botId}/get_speaker_timeline`); }
+  /**
+   * A large speaker timeline comes back as { bot_id, speaker_timeline_url, size_bytes, truncated }
+   * instead of the timeline itself. This downloads the file from that pre-signed URL (valid 1 hour).
+   * The URL needs no API key, so no Authorization header is sent to it.
+   */
+  async downloadSpeakerTimeline(url) {
+    const res = await this.fetch(url, { method: 'GET' });
+    const text = await res.text();
+    if (!res.ok) {
+      throw new ApiError(`GET speaker_timeline_url → HTTP ${res.status}: ${String(text).slice(0, 300)}`, { status: res.status, path: 'speaker_timeline_url' });
+    }
+    try { return JSON.parse(text); } catch { return text; }
+  }
   chats(botId) { return this.request('GET', `/bots/${botId}/get_chats`); }
-  screenshots(botId) { return this.request('GET', `/bots/${botId}/get_screenshots`); }
+  screenshots(botId) { return this.request('GET', `/bots/${botId}/screenshots`); }
   participants(botId) { return this.request('GET', `/bots/${botId}/get_participants`); }
   removeBot(botId) { return this.request('GET', `/bots/${botId}/remove_bot`); } // GET, not DELETE
   deleteBotData(botId) { return this.request('DELETE', `/bots/${botId}/delete`); }
@@ -76,6 +107,13 @@ export class MeetStreamClient {
       body: { img_url: imgUrl, ...(displayDuration ? { display_duration: displayDuration } : {}), ...(metadata ? { metadata } : {}) },
     });
   }
+
+  /** In-meeting command, e.g. raise_hand / lower_hand. The bot must be in the meeting. */
+  sendCommand(botId, command) {
+    return this.request('POST', `/bots/${botId}/send_command`, { body: { command } });
+  }
+  raiseHand(botId) { return this.sendCommand(botId, 'raise_hand'); }
+  lowerHand(botId) { return this.sendCommand(botId, 'lower_hand'); }
 
   // ── Transcription ─────────────────────────────────────────────────────
   transcriptions(botId) { return this.request('GET', `/bots/${botId}/transcriptions`); }
@@ -235,6 +273,10 @@ export class MeetStreamClient {
 
 const enc = (s) => encodeURIComponent(String(s));
 
+// recording_config.video_layout values. The *_default layouts are Google Meet and Teams only (the API returns 400 on Zoom).
+const VIDEO_LAYOUTS = ['speaker_view', 'grid_view', 'speaker_view_default', 'grid_view_default'];
+const STORAGE_ID_RE = /^[A-Za-z0-9_-]{1,80}$/;
+
 const TEAMS_HOSTS = ['teams.microsoft.com', 'teams.live.com', 'teams.cloud.microsoft'];
 const GOOGLE_HOSTS = ['meet.google.com'];
 
@@ -313,8 +355,8 @@ export function buildCreateBotPayload(opts) {
   // video_layout applies to mixed video only, so audio-only bots never carry it.
   if (payload.video_required) {
     const layout = String(opts.videoLayout || 'speaker_view').toLowerCase();
-    if (!['speaker_view', 'grid_view'].includes(layout)) {
-      throw usageError("--video-layout must be speaker_view or grid_view.");
+    if (!VIDEO_LAYOUTS.includes(layout)) {
+      throw usageError('--video-layout must be speaker_view or grid_view (Google Meet and Teams also accept speaker_view_default or grid_view_default).');
     }
     payload.recording_config = { ...(payload.recording_config || {}), video_layout: layout };
   } else if (opts.videoLayout) {
@@ -324,10 +366,24 @@ export function buildCreateBotPayload(opts) {
     throw new Error('--zoom-obf was removed: the API rejects use_zoom_obf. Use --zoom-obf-url <https-url> or --zoom-zak-url <https-url>.');
   }
   // Authenticated Zoom joins: each URL is an HTTPS endpoint on the caller's server that returns a fresh token.
+  // Both need the account's own Zoom app, so they cannot go with --no-zoom-use-own-app.
+  if (opts.zoomUseOwnApp === false && (opts.zoomZakUrl || opts.zoomObfUrl)) {
+    throw usageError('--zoom-zak-url and --zoom-obf-url need your own Zoom app; they cannot be used with --no-zoom-use-own-app.');
+  }
   if (opts.zoomZakUrl || opts.zoomObfUrl) {
     payload.zoom = {};
     if (opts.zoomZakUrl) payload.zoom.zak_url = opts.zoomZakUrl;
     if (opts.zoomObfUrl) payload.zoom.obf_url = opts.zoomObfUrl;
+  }
+  // Zoom join choice. Omitted = automatic: no setup, or the account's own Zoom app when it has one.
+  if (typeof opts.zoomUseOwnApp === 'boolean') {
+    payload.zoom = { ...(payload.zoom || {}), use_own_app: opts.zoomUseOwnApp };
+  }
+  if (opts.storageId !== undefined) {
+    if (!STORAGE_ID_RE.test(String(opts.storageId))) {
+      throw usageError('--storage-id must be 1-80 letters, numbers, underscores or hyphens.');
+    }
+    payload.storage_id = String(opts.storageId);
   }
   // Signed-in bots: Google Meet (google_meet) or Microsoft Teams (teams) accounts registered via `meetstream logins`.
   const signedIn = buildSignedInBlock(opts);
@@ -349,6 +405,9 @@ export function buildCreateBotPayload(opts) {
     else if (p === 'meeting_captions') provider.meeting_captions = {};
     else if (p === 'deepgram_streaming') provider.deepgram_streaming = { model: 'nova-3', language: opts.language || 'en' };
     else if (p === 'assemblyai_streaming') provider.assemblyai_streaming = {};
+    // Smallest AI needs the account's Smallest AI key saved in the MeetStream dashboard.
+    else if (p === 'smallest') provider.smallest = { model: 'pulse', language: opts.language || 'en', diarize: true };
+    else if (p === 'smallest_streaming') provider.smallest_streaming = { model: 'pulse', language: opts.language || 'en' };
     else provider[p] = {};
     payload.recording_config = {
       ...(payload.recording_config || {}),

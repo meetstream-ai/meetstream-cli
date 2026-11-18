@@ -65,15 +65,16 @@ meetstream transcript <bot_id> --wait
 | `bot list` | Lists every bot on the account with id, status, and platform |
 | `bot status <id> [--watch]` | Current status; `--watch` polls every 5s until a terminal state (`Stopped`/`Done`/`Error`/etc.) |
 | `bot detail <id>` | Full session metadata - platform, timings, status timeline, `transcript_id`, `caption_file` |
-| `bot summary <id>` | MeetStream's built-in AI meeting summary |
+| `bot summary <id>` | Removed: the API has no summary endpoint. The command exits 2 and points to `meetstream transcript <id>` |
 | `bot audio <id>` / `bot video <id>` | Presigned recording URL (audio valid 1h, video valid 10min) |
 | `bot streams <id>` / `bot audio-streams <id>` | Per-participant video/audio streams (needs `--separate-video`/`--separate-audio` at creation) |
 | `bot participants <id>` | Everyone detected in the meeting |
 | `bot chats <id>` | In-meeting chat messages |
-| `bot screenshots <id>` | Screenshots captured during the meeting |
-| `bot timeline <id>` | Speaker timeline - who spoke when |
+| `bot screenshots <id>` | Screenshots captured during the meeting, newest first, each with a 1h download URL |
+| `bot timeline <id> [--download]` | Speaker timeline - who spoke when. A very large timeline comes back as `speaker_timeline_url` (a download link valid 1h, no key needed) with `size_bytes`; `--download` fetches the file and prints the timeline |
 | `bot send-message <id> <text...>` | Posts a chat message into the **live** meeting |
 | `bot send-image <id> <img-url> [-d seconds]` | Shows an image/GIF as the bot's video frame (public URL required) |
+| `bot raise-hand <id>` / `bot lower-hand <id>` | Raises or lowers the bot's hand with the meeting's own control (Google Meet, Zoom, Teams). The bot must be in the meeting (`409` otherwise). Prints `hand_raised`, the state read back from the meeting. Safe to repeat |
 | `bot remove <id>` | Makes the bot leave the meeting now (data is kept) |
 | `bot delete <id> --yes` | **Permanently** deletes audio/video/transcripts - the `--yes` flag is mandatory, no accidental deletes |
 
@@ -82,10 +83,14 @@ meetstream transcript <bot_id> --wait
 ```
 -n, --name <name>                bot display name (default "MeetStream Bot")
 --video                           record video as well as audio (default: audio only)
---video-layout <layout>           with --video: speaker_view (default) or grid_view
+--video-layout <layout>           with --video: speaker_view (default) or grid_view;
+                                   Google Meet and Teams also accept
+                                   speaker_view_default, grid_view_default
 -t, --transcript <provider>      deepgram | assemblyai | sarvam | meetstream |
-                                   jigsawstack | meeting_captions |
-                                   deepgram_streaming | assemblyai_streaming
+                                   jigsawstack | smallest | meeting_captions |
+                                   deepgram_streaming | assemblyai_streaming |
+                                   smallest_streaming (smallest* need your Smallest AI
+                                   key saved in the dashboard)
 -l, --language <lang>            transcription language (provider-specific format)
 -c, --callback <url>             HTTPS webhook for lifecycle events
 --join-at <iso8601>              schedule a future join, e.g. 2026-07-02T15:00:00Z
@@ -96,6 +101,10 @@ meetstream transcript <bot_id> --wait
 --separate-video                 capture per-participant video streams
 --zoom-zak-url <url>             Zoom: HTTPS endpoint returning a ZAK token (signed-in join)
 --zoom-obf-url <url>             Zoom: HTTPS endpoint returning an OBF token (on-behalf-of join)
+--zoom-use-own-app               Zoom: always join with your own Zoom app
+--no-zoom-use-own-app            Zoom: always join with no setup (not with ZAK/OBF)
+--storage-id <id>                save the recording to this storage destination of
+                                   your workspace (default: the workspace default)
 --google-login-domain <domain>   Google Meet: join signed in with an account from this
                                    registered Workspace domain (see `logins google`)
 --teams-login-domain <domain>    Teams: join signed in with an account from this
@@ -116,6 +125,8 @@ meetstream transcript <bot_id> --wait
 --waiting-room-timeout <sec>     max seconds in waiting room (default 300)
 --max-recording-seconds <sec>    max in-call recording seconds (default 14400)
 ```
+
+**Zoom needs no setup.** Your API key and the meeting link are enough. With neither Zoom flag, the API chooses: no setup, or your own Zoom app when the account has saved Zoom app credentials or a connected Zoom account. `--zoom-zak-url` and `--zoom-obf-url` need your own Zoom app.
 
 **Signed-in bots.** `--google-login-domain` / `--teams-login-domain` send the `google_meet` / `teams` block (`login_required: true` plus the domain, and `sign_in_email` / `strict_email` when you pin an account). Pass one domain flag, not both. The CLI warns on stderr (and still sends) if the meeting link host doesn't match the platform. Signed-in Teams bots show the Microsoft account's own name and picture, so `--name` / `--image-url` are not applied.
 
@@ -156,7 +167,7 @@ printf '%s' "$BOT_PASSWORD" | meetstream logins teams add --domain bots.example.
 |---------|---------------|
 | `transcript <bot-id> [--wait] [--raw] [--json]` | Fetches the transcript, resolving `transcript_id` automatically (it's never in webhooks). `--wait` polls until ready. Default output is readable `Speaker: text` lines. |
 | `transcriptions <bot-id>` | Lists every transcription run for a bot - provider, status, presigned download URLs |
-| `transcribe <bot-id> -p <provider>` | (Re-)transcribes a bot's recorded audio, optionally with a different provider or language |
+| `transcribe <bot-id> -p <provider>` | (Re-)transcribes a bot's recorded audio, optionally with a different provider (`deepgram`, `assemblyai`, `sarvam`, `meetstream`, `jigsawstack`, `smallest`) or language |
 
 ### `calendar` - Google Calendar auto-join
 | Command | What it does |
@@ -218,6 +229,7 @@ bot.joining → bot.in_waiting_room → bot.inmeeting → bot.recording → bot.
 | `transcript` returns "not ready yet" | The meeting isn't fully processed, or the provider is streaming-only (no post-call transcript) - check `bot status` first |
 | `bot create` with a login domain fails with 400 "not registered" | Register the domain first: `meetstream logins teams add-domain <domain>` (or `logins google add-domain`) |
 | Signed-in Teams bot fails with 409 / 429 | The pinned account is busy or deactivated, or every account is in use. Add accounts (`logins teams add`), rotate a password (`set-password`), or use `--no-strict-email` |
+| `HTTP 429 ... (retry after N s)` on `bot create` | Prepaid accounts can create only a few bots per minute and per hour. Wait N seconds, then run the command again with the same `--idempotency-key`. With `--json`, the error has `retry_after` |
 | `listen` events never arrive | Confirm the bot's `--callback` URL is a public HTTPS URL (use `ngrok http <port>`) - MeetStream will not retry non-2xx or unreachable webhooks |
 
 ## Development

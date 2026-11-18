@@ -16,12 +16,12 @@ export function registerBotCommands(program, getClient) {
 
   bot
     .command('create')
-    .description('Send a bot to a meeting (or schedule with --join-at)')
+    .description('Send a bot to a meeting (or schedule with --join-at). Zoom needs no setup: the API key and the link are enough')
     .argument('<meeting-link>', 'Zoom / Google Meet / Teams meeting URL')
     .option('-n, --name <name>', 'bot display name', 'MeetStream Bot')
     .option('--video', 'record video as well as audio (default: audio only)')
-    .option('--video-layout <layout>', 'with --video: speaker_view (default) or grid_view')
-    .option('-t, --transcript <provider>', 'deepgram | assemblyai | sarvam | meetstream | jigsawstack | meeting_captions | deepgram_streaming | assemblyai_streaming')
+    .option('--video-layout <layout>', 'with --video: speaker_view (default) or grid_view; Google Meet and Teams also accept speaker_view_default, grid_view_default')
+    .option('-t, --transcript <provider>', 'deepgram | assemblyai | sarvam | meetstream | jigsawstack | smallest | meeting_captions | deepgram_streaming | assemblyai_streaming | smallest_streaming (smallest* need your Smallest AI key saved in the dashboard)')
     .option('-l, --language <lang>', 'transcription language (provider-specific format)')
     .option('-c, --callback <url>', 'HTTPS webhook for lifecycle events')
     .option('--join-at <iso8601>', 'schedule a future join, e.g. 2026-07-02T15:00:00Z')
@@ -33,6 +33,9 @@ export function registerBotCommands(program, getClient) {
     .option('--zoom-zak-url <url>', 'Zoom: HTTPS endpoint on your server returning a ZAK token (join as a signed-in user)')
     .option('--zoom-obf-url <url>', 'Zoom: HTTPS endpoint on your server returning an OBF token (join on behalf of a user in the meeting)')
     .option('--zoom-obf', 'removed: use --zoom-obf-url')
+    .option('--zoom-use-own-app', 'Zoom: always join with your own Zoom app (default: automatic, no setup unless the account has its own Zoom app)')
+    .option('--no-zoom-use-own-app', 'Zoom: always join with no setup (cannot be combined with --zoom-zak-url / --zoom-obf-url)')
+    .option('--storage-id <id>', 'save the recording to this storage destination of your workspace (default: the workspace default)')
     .option('--google-login-domain <domain>', 'Google Meet: join signed in with an account from this registered Workspace domain (see: meetstream logins google)')
     .option('--teams-login-domain <domain>', 'Teams: join signed in with an account from this registered Microsoft 365 domain (see: meetstream logins teams)')
     .option('--sign-in-email <email>', 'signed-in bots: pin one registered account (needs a login domain flag)')
@@ -67,6 +70,8 @@ export function registerBotCommands(program, getClient) {
           zoomObf: opts.zoomObf,
           zoomZakUrl: opts.zoomZakUrl,
           zoomObfUrl: opts.zoomObfUrl,
+          zoomUseOwnApp: opts.zoomUseOwnApp,
+          storageId: opts.storageId,
           googleLoginDomain: opts.googleLoginDomain,
           teamsLoginDomain: opts.teamsLoginDomain,
           signInEmail: opts.signInEmail,
@@ -134,12 +139,10 @@ export function registerBotCommands(program, getClient) {
 
   const simpleGets = [
     ['detail', 'botDetail', 'Full session metadata (incl. transcript_id + caption_file)'],
-    ['summary', 'botSummary', "MeetStream's built-in AI meeting summary"],
     ['audio', 'botAudio', 'Recorded audio URL (presigned S3, valid 1h)'],
     ['video', 'botVideo', 'Recorded video URL (presigned S3, valid 10min)'],
     ['streams', 'recordingStreams', 'Per-participant video streams (needs --separate-video at create)'],
     ['audio-streams', 'audioStreams', 'Per-participant audio streams (needs --separate-audio at create)'],
-    ['timeline', 'speakerTimeline', 'Speaker timeline (who spoke when)'],
     ['chats', 'chats', 'In-meeting chat messages'],
     ['screenshots', 'screenshots', 'Screenshots captured during the meeting'],
     ['participants', 'participants', 'Participant list'],
@@ -154,6 +157,50 @@ export function registerBotCommands(program, getClient) {
         try {
           const { data } = await getClient()[method](botId);
           printJson(data); // structured data - JSON is the honest default
+        } catch (e) { handleError(e, opts); }
+      });
+  }
+
+  bot
+    .command('timeline')
+    .description('Speaker timeline (who spoke when). A very large timeline comes back as a download link; --download fetches it')
+    .argument('<bot-id>')
+    .option('--download', 'when the API returns speaker_timeline_url, download the file and print the timeline')
+    .option('--json', 'JSON output')
+    .action(async (botId, opts) => {
+      try {
+        const client = getClient();
+        const { data } = await client.speakerTimeline(botId);
+        const url = data && typeof data === 'object' && !Array.isArray(data) ? data.speaker_timeline_url : undefined;
+        if (url && opts.download) return printJson(await client.downloadSpeakerTimeline(url));
+        if (url) warnErr(`The timeline is ${data.size_bytes ?? 'too many'} bytes, so the API returned a download link (valid 1 hour). Run again with --download to fetch it.`);
+        printJson(data);
+      } catch (e) { handleError(e, opts); }
+    });
+
+  bot
+    .command('summary')
+    .description('Removed: the API has no summary endpoint. Use: meetstream transcript <bot-id>')
+    .argument('<bot-id>')
+    .option('--json', 'JSON output')
+    .action((botId, opts) => {
+      const err = new Error(`MeetStream has no meeting summary endpoint. Fetch the transcript and summarize it: meetstream transcript ${botId}`);
+      err.exitCode = 2;
+      handleError(err, opts);
+    });
+
+  for (const [name, method, label] of [['raise-hand', 'raiseHand', 'raised'], ['lower-hand', 'lowerHand', 'lowered']]) {
+    bot
+      .command(name)
+      .description(`${label === 'raised' ? 'Raise' : 'Lower'} the bot's hand in the live meeting (Google Meet, Zoom, Teams; the bot must be in the meeting)`)
+      .argument('<bot-id>')
+      .option('--json', 'JSON output')
+      .action(async (botId, opts) => {
+        try {
+          const { data } = await getClient()[method](botId);
+          if (opts.json) return printJson(data);
+          ok(`Hand ${label}`);
+          kv({ hand_raised: String(data?.hand_raised ?? '(not reported)') });
         } catch (e) { handleError(e, opts); }
       });
   }
