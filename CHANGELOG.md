@@ -8,7 +8,7 @@ All notable changes to `@meetstream/cli`.
 
 - `meetstream transcript` printed `Unknown:` lines with no text: it read `speaker` / `transcript`, but segments name the speaker in `participant.name` and hold the text in `words[].text`. It now reads this shape (and the flat shape), and skips segments with no text.
 - Zoom help text: `bot create` says Zoom bots join through your Zoom app with an OBF or ZAK token (`--zoom-obf-url` / `--zoom-zak-url`). `--zoom-use-own-app` / `--no-zoom-use-own-app` stay and now say which `use_own_app` value they send; the text no longer says Zoom needs no setup.
-- README and AGENTS.md state MeetStream's inbuilt keys per mode: Pipeline: OpenAI + Deepgram (Deepgram speech-to-text; OpenAI LLM and voice). Realtime: OpenAI only. Any other provider: bring your own key.
+- README and AGENTS.md state: "Inbuilt keys work in pipeline mode only: Deepgram (speech-to-text) and OpenAI (LLM and voice). Realtime mode runs on OpenAI and needs your own OpenAI key. Any other provider: bring your own key." `key_source: "meetstream"` works in pipeline mode only.
 - Removed an internal ticket reference from a test comment.
 
 ## 0.6.0 (2026-11-21)
