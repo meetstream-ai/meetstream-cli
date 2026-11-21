@@ -158,7 +158,8 @@ export class MeetStreamClient {
             return { transcript_id: tid, transcript: segments };
           }
         } catch (e) {
-          if (!wait || (e.status && e.status !== 404 && e.status !== 400)) throw e;
+          // 422 = the transcript failed: final, never poll it.
+          if (!wait || e.status === 422 || (e.status && e.status !== 404 && e.status !== 400)) throw e;
         }
       }
       if (!wait || Date.now() > deadline) {
@@ -168,6 +169,10 @@ export class MeetStreamClient {
       await new Promise((r) => setTimeout(r, intervalMs));
     }
   }
+
+  // ── Billing ───────────────────────────────────────────────────────────
+  /** Prepaid balance, read only. 404 while the endpoint is not on for the account. */
+  balance() { return this.request('GET', '/billing/balance'); }
 
   // ── Calendar ──────────────────────────────────────────────────────────
   connectCalendar({ clientId, clientSecret, refreshToken }) {
@@ -200,8 +205,14 @@ export class MeetStreamClient {
 
   // ── MIA (conversational agents) ───────────────────────────────────────
   miaList() { return this.request('GET', '/mia'); }
+  miaGet(agentConfigId) { return this.request('GET', '/mia', { query: { agent_config_id: agentConfigId } }); }
   miaCreate(config) { return this.request('POST', '/mia', { body: config }); }
+  /** PUT replaces each block you send; the body must carry agent_config_id. */
   miaUpdate(config) { return this.request('PUT', '/mia', { body: config }); }
+  /** Test the connection to a local agent bridge (model.provider "local_agent"). */
+  miaCheckLocalAgent(agentConfigId) {
+    return this.request('GET', '/mia', { query: { agent_config_id: agentConfigId, check: 'local_agent' } });
+  }
   miaDelete(agentConfigId) { return this.request('DELETE', '/mia', { query: { agent_config_id: agentConfigId } }); }
 
   // ── Signed-in bots: Microsoft Teams logins ────────────────────────────
@@ -346,6 +357,7 @@ export function buildCreateBotPayload(opts) {
   if (opts.callback) payload.callback_url = opts.callback;
   if (opts.joinAt) payload.join_at = opts.joinAt;
   if (opts.agentConfigId) payload.agent_config_id = opts.agentConfigId;
+  if (opts.agentConfigParams && Object.keys(opts.agentConfigParams).length) payload.agent_config_params = opts.agentConfigParams;
   if (opts.separateAudio) payload.audio_separate_streams = true;
   // Per-participant video is opt-in only: never set implicitly.
   if (opts.separateVideo) payload.video_separate_streams = true;
@@ -431,3 +443,4 @@ export function buildCreateBotPayload(opts) {
   };
   return payload;
 }
+

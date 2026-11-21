@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { printJson, ok, kv, dim, handleError } from '../output.js';
+import { printJson, ok, kv, dim, warn, handleError } from '../output.js';
 import { saveConfig, resolveApiKey, CONFIG_PATH, BASE_URL } from '../config.js';
 
 export function registerAuthCommands(program, getClient) {
@@ -78,24 +78,110 @@ export function registerCalendarCommands(program, getClient) {
   });
 }
 
+function readJsonFile(path) {
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'));
+  } catch (e) {
+    throw Object.assign(new Error(`Could not read JSON from ${path}: ${e.message}`), { exitCode: 2 });
+  }
+}
+
 export function registerMiaCommands(program, getClient) {
-  const mia = program.command('mia').description('MIA conversational AI agents');
-  mia.command('list').description('List agent configs').action(async (opts) => {
+  const mia = program
+    .command('mia')
+    .alias('agents')
+    .description('Agents API: voice agent (MIA) configs. Attach one to a bot with: bot create <link> --agent-config <id>');
+
+  mia.command('list').description('List agent configs').option('--json', 'JSON output').action(async (opts) => {
     try { printJson((await getClient().miaList()).data); } catch (e) { handleError(e, opts); }
   });
+
+  mia.command('get').description('Show one agent config (secrets come back masked)').argument('<agent-config-id>')
+    .option('--json', 'JSON output')
+    .action(async (id, opts) => {
+      try { printJson((await getClient().miaGet(id)).data); } catch (e) { handleError(e, opts); }
+    });
+
   mia
     .command('create')
-    .description('Create an agent config from a JSON file (agent_name, mode, model, voice, transcriber, …)')
+    .description('Create an agent config from a JSON file (agent_name, mode, model, voice, transcriber, agent, ...)')
     .requiredOption('-f, --file <path>', 'JSON config file')
+    .option('--json', 'JSON output')
     .action(async (opts) => {
       try {
-        const cfg = JSON.parse(readFileSync(opts.file, 'utf8'));
-        const { data } = await getClient().miaCreate(cfg);
+        const { data } = await getClient().miaCreate(readJsonFile(opts.file));
+        if (opts.json) return printJson(data);
         ok('Agent config created'); printJson(data);
-        console.log(dim('Attach it to a bot: meetstream bot create <link> --agent-config-id <id> --socket-ws <wss> --live-audio-ws <wss>'));
+        const id = data?.agent_config_id || '<agent-config-id>';
+        console.log(dim(`Attach it to a bot (nothing else is needed): meetstream bot create <meeting-link> --agent-config ${id}`));
       } catch (e) { handleError(e, opts); }
     });
-  mia.command('delete').description('Delete an agent config').argument('<agent-config-id>').action(async (id, opts) => {
-    try { printJson((await getClient().miaDelete(id)).data); ok('Deleted'); } catch (e) { handleError(e, opts); }
-  });
+
+  mia
+    .command('update')
+    .description('Update an agent config from a JSON file (PUT: each block you send replaces the saved block, so send whole blocks)')
+    .argument('<agent-config-id>')
+    .requiredOption('-f, --file <path>', 'JSON file with the blocks to replace')
+    .option('--json', 'JSON output')
+    .action(async (id, opts) => {
+      try {
+        const body = { ...readJsonFile(opts.file), agent_config_id: id };
+        const { data } = await getClient().miaUpdate(body);
+        if (opts.json) return printJson(data);
+        ok('Agent config updated'); printJson(data);
+      } catch (e) { handleError(e, opts); }
+    });
+
+  mia.command('delete').description('Delete an agent config').argument('<agent-config-id>').option('--json', 'JSON output')
+    .action(async (id, opts) => {
+      try {
+        const { data } = await getClient().miaDelete(id);
+        if (opts.json) return printJson(data);
+        printJson(data); ok('Deleted');
+      } catch (e) { handleError(e, opts); }
+    });
+
+  mia
+    .command('check')
+    .description('Test the connection to your local agent bridge (model.provider "local_agent"; needs the local agent feature on for your account)')
+    .argument('<agent-config-id>')
+    .option('--json', 'JSON output')
+    .action(async (id, opts) => {
+      try {
+        const { data } = await getClient().miaCheckLocalAgent(id);
+        if (opts.json) return printJson(data);
+        const status = data?.local_agent?.status;
+        if (status === 'ok') ok(`Local agent bridge is reachable (${data.local_agent.latency_ms ?? '?'} ms)`);
+        else warn(`Local agent bridge status: ${status ?? 'unknown'}`);
+        printJson(data);
+        if (status && status !== 'ok') process.exit(3);
+      } catch (e) { handleError(e, opts); }
+    });
+}
+
+export function registerBalanceCommand(program, getClient) {
+  program
+    .command('balance')
+    .description('Show your prepaid balance (read only; available when the balance endpoint is on for your account)')
+    .option('--json', 'JSON output')
+    .action(async (opts) => {
+      try {
+        const { data } = await getClient().balance();
+        if (opts.json) return printJson(data);
+        if (data?.balance_usd == null) {
+          kv({ customer_type: data?.customer_type, balance: 'no prepaid balance (billed by invoice)' });
+        } else {
+          kv({ customer_type: data?.customer_type, balance: `${data.balance_usd} ${data.currency || 'USD'}` });
+        }
+        console.log(dim('  Top up: https://app.meetstream.ai/billing'));
+      } catch (e) {
+        if (e.status === 404) {
+          const msg = 'The balance endpoint is not available for this account yet. See your balance at https://app.meetstream.ai/billing';
+          if (opts.json) printJson({ error: 'balance_unavailable', status: 404, message: msg, billing_url: 'https://app.meetstream.ai/billing' });
+          else warn(msg);
+          process.exit(3);
+        }
+        handleError(e, opts);
+      }
+    });
 }

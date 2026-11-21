@@ -1,11 +1,11 @@
 import { buildCreateBotPayload, signedInWarnings } from '../api.js';
 import { printJson, ok, kv, bold, dim, cyan, transcriptToText, handleError, warnErr } from '../output.js';
 
-function parseAttrs(list = []) {
+function parseAttrs(list = [], flag = '--attr') {
   const out = {};
   for (const item of list) {
     const i = item.indexOf('=');
-    if (i === -1) throw Object.assign(new Error(`--attr expects key=value, got "${item}"`), { exitCode: 2 });
+    if (i === -1) throw Object.assign(new Error(`${flag} expects key=value, got "${item}"`), { exitCode: 2 });
     out[item.slice(0, i)] = item.slice(i + 1); // values kept as strings (API expects strings)
   }
   return out;
@@ -40,7 +40,9 @@ export function registerBotCommands(program, getClient) {
     .option('--teams-login-domain <domain>', 'Teams: join signed in with an account from this registered Microsoft 365 domain (see: meetstream logins teams)')
     .option('--sign-in-email <email>', 'signed-in bots: pin one registered account (needs a login domain flag)')
     .option('--no-strict-email', 'with --sign-in-email: fall back to any free account in the domain instead of failing')
-    .option('--agent-config-id <id>', 'attach a MIA conversational agent')
+    .option('--agent-config <id>', 'attach a voice agent (Agents API): the agent_config_id from "meetstream mia create". Nothing else is needed')
+    .option('--agent-config-id <id>', 'same as --agent-config')
+    .option('--agent-param <key=value...>', 'agent_config_params: values for {{variable}} placeholders in the agent prompt')
     .option('--live-transcript-webhook <url>', 'webhook URL for live transcript chunks')
     .option('--live-audio-ws <wss>', 'WebSocket URL for live audio out')
     .option('--live-video-ws <wss>', 'reserved: the API accepts live_video_required.websocket_url but does not deliver live video yet')
@@ -76,7 +78,8 @@ export function registerBotCommands(program, getClient) {
           teamsLoginDomain: opts.teamsLoginDomain,
           signInEmail: opts.signInEmail,
           strictEmail: opts.strictEmail,
-          agentConfigId: opts.agentConfigId,
+          agentConfigId: opts.agentConfig || opts.agentConfigId,
+          agentConfigParams: parseAttrs(opts.agentParam, '--agent-param'),
           liveTranscriptWebhook: opts.liveTranscriptWebhook,
           liveAudioWs: opts.liveAudioWs,
           liveVideoWs: opts.liveVideoWs,
@@ -86,6 +89,9 @@ export function registerBotCommands(program, getClient) {
           waitingRoomTimeout: opts.waitingRoomTimeout,
           maxRecordingSeconds: opts.maxRecordingSeconds,
         });
+        if (payload.agent_config_id && (opts.socketWs || opts.liveAudioWs)) {
+          warnErr('A voice agent needs only --agent-config. --socket-ws / --live-audio-ws are for your own bridge and are the usual cause of a silent agent.');
+        }
         for (const w of signedInWarnings({ meetingLink, googleLoginDomain: opts.googleLoginDomain, teamsLoginDomain: opts.teamsLoginDomain })) warnErr(w);
         const { status, data } = await getClient().createBot(payload, { idempotencyKey: opts.idempotencyKey });
         if (opts.json) return printJson(data);
@@ -139,8 +145,8 @@ export function registerBotCommands(program, getClient) {
 
   const simpleGets = [
     ['detail', 'botDetail', 'Full session metadata (incl. transcript_id + caption_file)'],
-    ['audio', 'botAudio', 'Recorded audio URL (presigned S3, valid 1h)'],
-    ['video', 'botVideo', 'Recorded video URL (presigned S3, valid 10min)'],
+    ['audio', 'botAudio', 'Recorded audio download link (valid 1 hour)'],
+    ['video', 'botVideo', 'Recorded video download link (valid 1 hour)'],
     ['streams', 'recordingStreams', 'Per-participant video streams (needs --separate-video at create)'],
     ['audio-streams', 'audioStreams', 'Per-participant audio streams (needs --separate-audio at create)'],
     ['chats', 'chats', 'In-meeting chat messages'],

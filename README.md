@@ -10,6 +10,59 @@ meetstream bot create "https://meet.google.com/abc-defg-hij" -t deepgram
 
 ---
 
+## Two ways to integrate
+
+1. **Bot API: meeting bots and recording.** Send a bot to Zoom, Google Meet or Microsoft Teams, then get recordings, transcripts, participants, chat and webhooks after the call, or live data during the call. This is the default.
+2. **Agents API: voice agents in the meeting.** A voice agent (API name: MIA) rides on the bot and answers by voice, in the chat, or with tool calls. Use it when you want an agent that talks.
+
+Guide: [Two ways to integrate](https://docs.meetstream.ai/guides/introduction/integration-paths).
+
+**Path 1, fastest path.** Decide first: notes after the call (post-call), or something during the call (live)?
+
+```bash
+# Post-call: bot, webhooks, then the transcript
+meetstream bot create "https://meet.google.com/abc-defg-hij" -t meetstream -c https://you.example.com/webhook
+meetstream transcript <bot_id> --wait
+
+# Live: live transcript webhook, then raise the bot's hand while it is in the meeting
+meetstream bot create "https://zoom.us/j/123456789" -t deepgram_streaming --live-transcript-webhook https://you.example.com/live
+meetstream bot raise-hand <bot_id>     # POST /api/v1/bots/{bot_id}/send_command {"command":"raise_hand"}
+```
+
+**Path 2, fastest path.** Save an agent config, then send a bot with its id. Nothing else is needed on the bot.
+
+```bash
+cat > agent.json <<'JSON'
+{
+  "agent_name": "Meeting assistant",
+  "mode": "pipeline",
+  "transcriber": { "provider": "deepgram", "model": "nova-3", "key_source": "meetstream" },
+  "model": { "provider": "openai", "model": "gpt-4.1", "key_source": "meetstream",
+             "system_prompt": "You are a helpful meeting assistant. Keep answers short.",
+             "first_message": "Hi, I'm an AI assistant on this call." },
+  "voice": { "provider": "openai", "voice_id": "coral", "key_source": "meetstream" }
+}
+JSON
+meetstream mia create -f agent.json                       # prints agent_config_id
+meetstream bot create "https://meet.google.com/abc-defg-hij" --agent-config <agent_config_id>
+```
+
+**Voice agent setups and pricing** (per meeting hour):
+
+| Setup | What you do | Price |
+|---|---|---|
+| a. MeetStream's inbuilt keys (default) | `"key_source": "meetstream"` on each pipeline section, no `api_key`. Inbuilt keys cover OpenAI (LLM, speech and voice models) and Deepgram (speech-to-text) today. | Bot price + $0.25 agent infrastructure + the per-hour price of each model you pick (the dashboard agent editor shows the rate before the bot runs) |
+| b. Your own keys | Your provider keys (OpenAI, Anthropic, Deepgram, ElevenLabs and others) under Integrations; `"key_source": "user"` or leave it out | Bot price + $0.25 agent infrastructure; your provider bills you for model usage |
+| c. Your own agent | `"model": {"provider": "local_agent", "local_agent": {"url": "https://..."}}` with the [MeetStream Agent Kit](https://github.com/meetstream-ai/agent-kit); check it with `meetstream mia check <id>` | Bot price + $0.25 agent infrastructure; no model tokens charged for your agent's reasoning |
+
+Bot price: $0.35 per recording hour ($0.25 at volume). The MeetStream transcription add-on is $0.10 per hour, waived with your own provider key. Details: [Voice agent pricing and keys](https://docs.meetstream.ai/guides/mia/pricing-and-keys).
+
+If inbuilt keys are not on for your account yet, `mia create` fails with `MeetStream-managed keys are not available for <section>. Use your own key.` Switch that section to your own key (setup b) and run it again; do not loop.
+
+Setup c is opt-in and needs the local agent feature on for your account. Meeting speech reaches an agent that has access to your computer and terminal (prompt injection), so keep the lowest access level (`readonly`) and the activation code on, and keep your computer, the agent and the bridge running for the whole call. Guide: [MIA screen sharing and custom agents](https://docs.meetstream.ai/guides/features/mia-screen-sharing-and-custom-agents).
+
+---
+
 ## Authentication
 
 Every command authenticates to `https://api.meetstream.ai/api/v1` with `Authorization: Token <your-key>`. There's no OAuth flow or separate CLI login - the API key **is** the credential.
@@ -66,7 +119,7 @@ meetstream transcript <bot_id> --wait
 | `bot status <id> [--watch]` | Current status; `--watch` polls every 5s until a terminal state (`Stopped`/`Done`/`Error`/etc.) |
 | `bot detail <id>` | Full session metadata - platform, timings, status timeline, `transcript_id`, `caption_file` |
 | `bot summary <id>` | Removed: the API has no summary endpoint. The command exits 2 and points to `meetstream transcript <id>` |
-| `bot audio <id>` / `bot video <id>` | Presigned recording URL (audio valid 1h, video valid 10min) |
+| `bot audio <id>` / `bot video <id>` | Recording download link (valid 1 hour) |
 | `bot streams <id>` / `bot audio-streams <id>` | Per-participant video/audio streams (needs `--separate-video`/`--separate-audio` at creation) |
 | `bot participants <id>` | Everyone detected in the meeting |
 | `bot chats <id>` | In-meeting chat messages |
@@ -113,7 +166,9 @@ meetstream transcript <bot_id> --wait
                                    (requires a login domain flag)
 --no-strict-email                with --sign-in-email: fall back to any free account
                                    in the domain instead of failing (API default: strict)
---agent-config-id <id>           attach a MIA conversational agent
+--agent-config <id>              attach a voice agent (Agents API); nothing else is
+                                   needed (alias: --agent-config-id)
+--agent-param <key=value...>     agent_config_params for {{variable}} placeholders
 --live-transcript-webhook <url>  webhook URL for live transcript chunks
 --live-audio-ws <wss>            WebSocket URL for live audio out
 --live-video-ws <wss>            reserved: accepted by the API, but live video
@@ -166,8 +221,8 @@ printf '%s' "$BOT_PASSWORD" | meetstream logins teams add --domain bots.example.
 ### `transcript` / `transcriptions` / `transcribe` - transcription
 | Command | What it does |
 |---------|---------------|
-| `transcript <bot-id> [--wait] [--raw] [--json]` | Fetches the transcript, resolving `transcript_id` automatically (it's never in webhooks). `--wait` polls until ready. Default output is readable `Speaker: text` lines. |
-| `transcriptions <bot-id>` | Lists every transcription run for a bot - provider, status, presigned download URLs |
+| `transcript <bot-id> [--wait] [--raw] [--json]` | Fetches the transcript, resolving `transcript_id` automatically (it's never in webhooks). `--wait` polls until ready. Default output is readable `Speaker: text` lines. A failed transcript (`422`) prints `Transcript failed: <reason>` and the next step, and exits with code 4: it will not become ready, so fix the cause and run `transcribe`. |
+| `transcriptions <bot-id>` | Lists every transcription run for a bot - provider, status, download links |
 | `transcribe <bot-id> -p <provider>` | (Re-)transcribes a bot's recorded audio, optionally with a different provider (`deepgram`, `assemblyai`, `sarvam`, `meetstream`, `jigsawstack`, `smallest`) or language |
 
 ### `calendar` - Google Calendar auto-join
@@ -181,12 +236,22 @@ printf '%s' "$BOT_PASSWORD" | meetstream logins teams add --domain bots.example.
 | `calendar reschedule <bot-id> <iso8601>` | Change a scheduled bot's join time |
 | `calendar cancel <bot-id>` | Delete a scheduled (not-yet-joined) bot |
 
-### `mia` - conversational AI agents
+### `mia` (alias `agents`) - Agents API, voice agent configs
 | Command | What it does |
 |---------|---------------|
 | `mia list` | Lists agent configs |
-| `mia create -f <config.json>` | Creates an agent config (`agent_name`, `mode`, `model`, `voice`, `transcriber`, …) - attach it to a bot with `--agent-config-id` |
+| `mia get <agent-config-id>` | Shows one agent config (secrets come back masked) |
+| `mia create -f <config.json>` | Creates an agent config (`agent_name`, `mode`, `model`, `voice`, `transcriber`, `agent`, ...). Attach it with `bot create <link> --agent-config <id>` |
+| `mia update <agent-config-id> -f <blocks.json>` | Updates a config (`PUT`): each block in the file replaces the saved block, so send whole blocks. Running bots are not changed |
 | `mia delete <agent-config-id>` | Deletes an agent config |
+| `mia check <agent-config-id>` | Tests the connection to your local agent bridge (`model.provider: "local_agent"`). Exits 3 when the status is not `ok` |
+
+The config file takes the fields of the [MIA API guide](https://docs.meetstream.ai/guides/mia/mia-api-guide), including `key_source` on `transcriber` / `model` / `voice`, `transcriber.language`, and the agent options `agent.tools` (`["screen"]` on Google Meet), `agent.chat_input`, `agent.quiet_actions` and `agent.speak_only_when_asked`.
+
+### `balance` - prepaid balance
+| Command | What it does |
+|---------|---------------|
+| `balance [--json]` | Shows your prepaid balance (`GET /api/v1/billing/balance`, read only). Available when the balance endpoint is on for your account; until then it prints where to see the balance (https://app.meetstream.ai/billing) and exits 3 |
 
 ### `listen` - local webhook receiver
 | Command | What it does |
@@ -227,6 +292,8 @@ bot.joining → bot.in_waiting_room → bot.inmeeting → bot.recording → bot.
 |---------|-----|
 | "No API key found" | Run `meetstream auth set-key <key>` or `export MEETSTREAM_API_KEY=...` |
 | `auth status` fails with 401 | Key is invalid/revoked - generate a new one at [app.meetstream.ai/api-keys](https://app.meetstream.ai/api-keys) |
+| `transcript` prints "Transcript failed: ..." (exit 4) | The transcript ended `Failed` (API `422`), for example the provider rejected the key or its usage limit was reached. Fix the cause, then `meetstream transcribe <bot-id>` |
+| `mia create` fails with "MeetStream-managed keys are not available" | Inbuilt keys are not on for your account yet. Use your own provider key for that section (`"key_source": "user"`) |
 | `transcript` returns "not ready yet" | The meeting isn't fully processed, or the provider is streaming-only (no post-call transcript) - check `bot status` first |
 | `bot create` with a login domain fails with 400 "not registered" | Register the domain first: `meetstream logins teams add-domain <domain>` (or `logins google add-domain`) |
 | Signed-in Teams bot fails with 409 / 429 | The pinned account is busy or deactivated, or every account is in use. Add accounts (`logins teams add`), rotate a password (`set-password`), or use `--no-strict-email` |
@@ -242,7 +309,15 @@ npm test          # node --test, fully mocked (no network)
 
 ---
 
-Docs: [docs.meetstream.ai](https://docs.meetstream.ai) · OpenAPI: [openapi.json](https://docs.meetstream.ai/openapi.json) · MCP server for AI agents: [meetstream-mcp](https://github.com/meetstream-ai/meetstream-mcp) (hosted at `https://mcp.meetstream.ai/mcp`) · Migrating from Recall.ai: [@meetstream/migrate](https://github.com/meetstream-ai/recall-meetstream-migration-kit)
+## Latest docs
+
+- [Two ways to integrate](https://docs.meetstream.ai/guides/introduction/integration-paths) · [CLI](https://docs.meetstream.ai/build-with-ai/meetstream-cli)
+- [Create Bot payload reference](https://docs.meetstream.ai/api-reference/create-bot-payload-reference) · [Webhooks and events](https://docs.meetstream.ai/guides/webhooks/webhooks-and-events) · [Errors](https://docs.meetstream.ai/errors)
+- [MIA API guide](https://docs.meetstream.ai/guides/mia/mia-api-guide) · [Voice agent pricing and keys](https://docs.meetstream.ai/guides/mia/pricing-and-keys)
+
+For the latest details, fetch the page with `.md` appended, read https://docs.meetstream.ai/llms.txt, or connect the docs MCP server at https://docs.meetstream.ai/_mcp/server. If this README and the docs differ, the docs are correct.
+
+OpenAPI: [openapi.json](https://docs.meetstream.ai/openapi.json) · Hosted MCP server for AI agents: `https://mcp.meetstream.ai/mcp` ([docs](https://docs.meetstream.ai/build-with-ai/meetstream-mcp-server)) · Migrating from Recall.ai: [@meetstream/migrate](https://www.npmjs.com/package/@meetstream/migrate) · Changes: [CHANGELOG.md](CHANGELOG.md)
 
 MIT © MeetStream.ai
 
