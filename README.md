@@ -166,7 +166,6 @@ meetstream transcript <bot_id> --wait
 --zoom-zak-url <url>             Zoom: HTTPS endpoint returning a ZAK token (signed-in join)
 --zoom-obf-url <url>             Zoom: HTTPS endpoint returning an OBF token (on-behalf-of join)
 --zoom-use-own-app               Zoom: always join with your own Zoom app
---no-zoom-use-own-app            Zoom: always join with no setup (not with ZAK/OBF)
 --storage-id <id>                save the recording to this storage destination of
                                    your workspace (default: the workspace default)
 --google-login-domain <domain>   Google Meet: join signed in with an account from this
@@ -193,7 +192,7 @@ meetstream transcript <bot_id> --wait
 --max-recording-seconds <sec>    max in-call recording seconds (default 14400)
 ```
 
-**Zoom needs no setup.** Your API key and the meeting link are enough. With neither Zoom flag, the API chooses: no setup, or your own Zoom app when the account has saved Zoom app credentials or a connected Zoom account. `--zoom-zak-url` and `--zoom-obf-url` need your own Zoom app.
+**Zoom joins through your Zoom app.** Bots join through your Zoom app (Meeting SDK) with an OBF token (`--zoom-obf-url`, on behalf of a user who is in the meeting) or a ZAK token (`--zoom-zak-url`, a signed-in bot), the way Zoom asks Meeting SDK apps to join since 2 March 2026. Setup: [Zoom Marketplace app setup](https://docs.meetstream.ai/guides/app-integrations/zoom-marketplace-app-setup) · [Zoom authenticated bots (ZAK and OBF)](https://docs.meetstream.ai/guides/app-integrations/zoom-authenticated-bots).
 
 **Signed-in bots.** `--google-login-domain` / `--teams-login-domain` send the `google_meet` / `teams` block (`login_required: true` plus the domain, and `sign_in_email` / `strict_email` when you pin an account). Pass one domain flag, not both. The CLI warns on stderr (and still sends) if the meeting link host doesn't match the platform. Signed-in Teams bots show the Microsoft account's own name and picture, so `--name` / `--image-url` are not applied.
 
