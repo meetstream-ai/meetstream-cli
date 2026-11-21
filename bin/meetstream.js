@@ -7,7 +7,7 @@ import { resolveApiKey } from '../src/config.js';
 import { fail } from '../src/output.js';
 import { registerBotCommands } from '../src/commands/bot.js';
 import { registerTranscriptCommands } from '../src/commands/transcript.js';
-import { registerAuthCommands, registerCalendarCommands, registerMiaCommands } from '../src/commands/misc.js';
+import { registerAuthCommands, registerCalendarCommands, registerMiaCommands, registerBalanceCommand } from '../src/commands/misc.js';
 import { registerListenCommand } from '../src/commands/listen.js';
 import { registerLoginsCommands } from '../src/commands/logins.js';
 import { track, shutdownTelemetry } from '../src/telemetry.js';
@@ -32,6 +32,7 @@ registerBotCommands(program, getClient);
 registerTranscriptCommands(program, getClient);
 registerCalendarCommands(program, getClient);
 registerMiaCommands(program, getClient);
+registerBalanceCommand(program, getClient);
 registerLoginsCommands(program, getClient);
 registerListenCommand(program);
 

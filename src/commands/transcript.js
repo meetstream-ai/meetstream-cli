@@ -41,7 +41,7 @@ export function registerTranscriptCommands(program, getClient) {
     .command('transcribe')
     .description('Run (or re-run) transcription on a bot\'s recorded audio')
     .argument('<bot-id>')
-    .option('-p, --provider <name>', 'deepgram | assemblyai | sarvam | meetstream | jigsawstack', 'deepgram')
+    .option('-p, --provider <name>', 'deepgram | assemblyai | sarvam | meetstream | jigsawstack | smallest (needs your Smallest AI key saved in the dashboard)', 'deepgram')
     .option('-l, --language <lang>', 'language (provider-specific format)')
     .option('-c, --callback <url>', 'webhook to notify when done')
     .option('--json', 'JSON output')
@@ -54,6 +54,7 @@ export function registerTranscriptCommands(program, getClient) {
         else if (p === 'sarvam') provider.sarvam = { model: 'saarika:v2', language_code: opts.language || 'en-IN', mode: 'batch' };
         else if (p === 'meetstream') provider.meetstream = { language: opts.language || 'auto', translate: false };
         else if (p === 'jigsawstack') provider.jigsawstack = { language: opts.language || 'auto', translate: false };
+        else if (p === 'smallest') provider.smallest = { model: 'pulse', language: opts.language || 'en' };
         else provider[p] = {};
         const { data } = await getClient().transcribe(botId, provider, opts.callback);
         if (opts.json) return printJson(data);

@@ -8,7 +8,7 @@ When building anything against the MeetStream API, install and use the MeetStrea
 
 Do not treat the files in this repository as authoritative for MeetStream API behaviour. They can lag the API. If local code and the MCP disagree, the MCP wins unless the user says otherwise.
 
-Server name: `meetstream`. URL: `https://mcp.meetstream.ai/mcp`. MeetStream hosts it; there is no local install. Do not use `npx @meetstream/mcp`: that npm package is the old Node server, frozen at 0.3.0, and it predates the current defaults.
+Server name: `meetstream`. URL: `https://mcp.meetstream.ai/mcp`. MeetStream hosts it; there is no local install. Do not install the `@meetstream/mcp` npm package: the hosted URL is the supported server.
 
 Add the URL with **no key** and sign in: the client opens app.meetstream.ai, the user clicks Allow, and the dashboard creates an API key for that connection (delete it on the API keys page to disconnect). Use an API key header only when the client cannot do OAuth.
 
@@ -139,9 +139,12 @@ These are live-verified. Do not "fix" code that follows them.
 - **`202` and `507` are not errors.** 202 means poll again; 507 means an idempotent retry replayed and is a success.
 - The bot field is **`meeting_link`**, not `meeting_url`.
 - `in_call_recording_timeout` has a hard floor of **600 seconds**; below it the API returns 400.
+- **Two ways to integrate.** The Bot API (meeting bots and recording) is the default. Use the Agents API (voice agents, API name MIA) only when the user asks for an agent that talks in the meeting.
+- **Voice agent keys.** `key_source: "meetstream"` on `transcriber`, `model` and `voice` (pipeline mode, no `api_key`) uses MeetStream's inbuilt keys; `"user"` or omitted uses the customer's own keys. While inbuilt keys are not on for an account, the API returns 400 `MeetStream-managed keys are not available for <section>. Use your own key.`: switch that section to the customer's own key, do not retry.
+- **A failed transcript is `422`**, with `message`, `transcript_status: "Failed"` and `transcript_id`. It is final: surface the reason, never poll it.
 - MIA bots take **only `agent_config_id`**. Adding `socket_connection_url` or `live_audio_required` alongside it is the usual cause of a silent agent.
-- **Video is off by default.** Send `"video_required": false` on every bot unless the user explicitly asks to record video. The API defaults it to `true`, so an omitted field records video, and transcripts, summaries, diarization and speaker timelines all work without it.
-- **When video is on, send a layout.** `recording_config.video_layout` accepts exactly `"speaker_view"` or `"grid_view"` and defaults to `"grid_view"`, so pass `"speaker_view"` explicitly unless the user asks for grid or gallery view. It is ignored when video is off; Google Meet, Teams and Zoom accept both values, and WhatsApp accepts only `"grid_view"`.
+- **Video is off by default.** Send `"video_required": false` on every bot unless the user explicitly asks to record video. Transcripts, diarization and speaker timelines all work without it.
+- **When video is on, send a layout.** `recording_config.video_layout` defaults to `"grid_view"`, so pass `"speaker_view"` explicitly unless the user asks for grid or gallery view. It is ignored when video is off. Google Meet, Teams and Zoom accept `"speaker_view"` and `"grid_view"`; Google Meet and Teams also accept `"speaker_view_default"` and `"grid_view_default"`; WhatsApp accepts only `"grid_view"`.
 - **Per-participant video is opt-in only.** Never set `video_separate_streams` (top level or under `recording_config`) unless the user explicitly asks for per-participant video streams. Per-participant audio (`audio_separate_streams`) is unaffected.
 
 ## Security
