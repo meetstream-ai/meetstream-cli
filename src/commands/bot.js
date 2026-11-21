@@ -16,7 +16,7 @@ export function registerBotCommands(program, getClient) {
 
   bot
     .command('create')
-    .description('Send a bot to a meeting (or schedule with --join-at). Zoom needs no setup: the API key and the link are enough')
+    .description('Send a bot to a meeting (or schedule with --join-at). Zoom bots join through your Zoom app with an OBF or ZAK token (--zoom-obf-url / --zoom-zak-url)')
     .argument('<meeting-link>', 'Zoom / Google Meet / Teams meeting URL')
     .option('-n, --name <name>', 'bot display name', 'MeetStream Bot')
     .option('--video', 'record video as well as audio (default: audio only)')
@@ -33,8 +33,8 @@ export function registerBotCommands(program, getClient) {
     .option('--zoom-zak-url <url>', 'Zoom: HTTPS endpoint on your server returning a ZAK token (join as a signed-in user)')
     .option('--zoom-obf-url <url>', 'Zoom: HTTPS endpoint on your server returning an OBF token (join on behalf of a user in the meeting)')
     .option('--zoom-obf', 'removed: use --zoom-obf-url')
-    .option('--zoom-use-own-app', 'Zoom: always join with your own Zoom app (default: automatic, no setup unless the account has its own Zoom app)')
-    .option('--no-zoom-use-own-app', 'Zoom: always join with no setup (cannot be combined with --zoom-zak-url / --zoom-obf-url)')
+    .option('--zoom-use-own-app', 'Zoom: send use_own_app=true (needs your connected Zoom app; the API returns 400 without one)')
+    .option('--no-zoom-use-own-app', 'Zoom: send use_own_app=false (cannot be combined with --zoom-zak-url / --zoom-obf-url)')
     .option('--storage-id <id>', 'save the recording to this storage destination of your workspace (default: the workspace default)')
     .option('--google-login-domain <domain>', 'Google Meet: join signed in with an account from this registered Workspace domain (see: meetstream logins google)')
     .option('--teams-login-domain <domain>', 'Teams: join signed in with an account from this registered Microsoft 365 domain (see: meetstream logins teams)')
