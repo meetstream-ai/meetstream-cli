@@ -16,7 +16,7 @@ meetstream bot create "https://meet.google.com/abc-defg-hij" -t deepgram
 |---|---|---|
 | **1. Recording only** (Bot API) | Send a bot to Zoom, Google Meet or Microsoft Teams, then get recordings, transcripts, participants, chat and webhooks after the call, or live data during the call. This is the default. | Bot price |
 | **2. Agents in meetings, your own stack** (recommended first for an agent) | **2a. Bridge server:** the bot streams live audio to your server, and your server sends audio, chat and images back; you run your own speech-to-text, LLM and voice, hosted or local. **2b. Your own agent as the brain:** Claude Code, Codex, Hermes, OpenClaw and others answer through `model.provider: "local_agent"` and the Agent Kit. | 2a: bot price only. 2b: bot price + $0.25 agent infrastructure. No model tokens charged in either. |
-| **3. Managed agent infrastructure** (Agents API) | MeetStream hosts the voice agent (API name: MIA). **3a.** MeetStream's inbuilt keys (OpenAI and Deepgram today). **3b.** Your own provider keys. | Bot price + $0.25 agent infrastructure + the models you pick |
+| **3. Managed agent infrastructure** (Agents API) | MeetStream hosts the voice agent (API name: MIA). **3a.** MeetStream's inbuilt keys. Inbuilt keys work in pipeline mode only: Deepgram (speech-to-text) and OpenAI (LLM and voice). Realtime mode runs on OpenAI and needs your own OpenAI key. Any other provider: bring your own key. **3b.** Your own provider keys. | Bot price + $0.25 agent infrastructure + the models you pick |
 
 Bot price: $0.35 per recording hour ($0.25 at volume). The MeetStream transcription add-on is $0.10 per hour, waived with your own provider key. Guide: [Integration paths](https://docs.meetstream.ai/guides/introduction/integration-paths).
 
@@ -64,7 +64,7 @@ meetstream mia create -f agent.json                       # prints agent_config_
 meetstream bot create "https://meet.google.com/abc-defg-hij" --agent-config <agent_config_id>
 ```
 
-- **3a. MeetStream's inbuilt keys:** `"key_source": "meetstream"` on each pipeline section, no `api_key`. Inbuilt keys cover OpenAI (LLM, speech and voice models) and Deepgram (speech-to-text) today.
+- **3a. MeetStream's inbuilt keys:** `"key_source": "meetstream"` on each pipeline section, no `api_key`. Inbuilt keys work in pipeline mode only: Deepgram (speech-to-text) and OpenAI (LLM and voice). Realtime mode runs on OpenAI and needs your own OpenAI key. Any other provider: bring your own key.
 - **3b. Your own keys:** your provider keys (OpenAI, Anthropic, Deepgram, ElevenLabs and others) under Integrations; `"key_source": "user"` or leave it out. Your provider bills you for model usage.
 - **Price:** bot price + $0.25 agent infrastructure + the per-hour price of each model you pick (the dashboard agent editor shows the rate before the bot runs). Details: [Voice agent pricing and keys](https://docs.meetstream.ai/guides/mia/pricing-and-keys) and the [MIA API guide](https://docs.meetstream.ai/guides/mia/mia-api-guide).
 
@@ -165,7 +165,7 @@ meetstream transcript <bot_id> --wait
 --separate-video                 capture per-participant video streams
 --zoom-zak-url <url>             Zoom: HTTPS endpoint returning a ZAK token (signed-in join)
 --zoom-obf-url <url>             Zoom: HTTPS endpoint returning an OBF token (on-behalf-of join)
---zoom-use-own-app               Zoom: always join with your own Zoom app
+--zoom-use-own-app               Zoom: send use_own_app=true (needs your connected Zoom app)
 --storage-id <id>                save the recording to this storage destination of
                                    your workspace (default: the workspace default)
 --google-login-domain <domain>   Google Meet: join signed in with an account from this

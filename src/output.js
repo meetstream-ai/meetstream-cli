@@ -26,11 +26,34 @@ export function kv(pairs) {
   }
 }
 
-/** Render transcript segments (speaker + transcript fields) as readable text. */
+const str = (v) => (typeof v === 'string' ? v.trim() : '');
+
+/** Speaker of a transcript segment: participant.name, else the flat speaker field. */
+export function segmentSpeaker(s) {
+  return str(s?.participant?.name) || str(s?.speaker) || 'Unknown';
+}
+
+/** Text of a transcript segment: words[].text joined with spaces, else the flat transcript field. */
+export function segmentText(s) {
+  if (Array.isArray(s?.words)) {
+    const parts = s.words.map((w) => str(w?.text ?? w?.punctuated_word ?? w?.word)).filter(Boolean);
+    if (parts.length) return parts.join(' ');
+  }
+  return str(s?.transcript) || str(s?.text);
+}
+
+/**
+ * Render transcript segments as readable "Speaker: text" lines. Segments name the speaker in
+ * participant.name and hold the text in words[].text; the flat speaker/transcript shape also works.
+ * Segments with no text are skipped.
+ */
 export function transcriptToText(segments) {
   if (!Array.isArray(segments)) return typeof segments === 'string' ? segments : JSON.stringify(segments, null, 2);
   return segments
-    .map((s) => `${s.speaker ?? 'Unknown'}: ${s.transcript ?? ''}`.trim())
+    .map((s) => {
+      const text = segmentText(s);
+      return text ? `${segmentSpeaker(s)}: ${text}` : '';
+    })
     .filter(Boolean)
     .join('\n');
 }

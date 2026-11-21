@@ -282,7 +282,7 @@ test('buildCreateBotPayload: --video-layout is validated and needs --video', () 
   assert.throws(() => buildCreateBotPayload({ meetingLink: 'm', video: true, videoLayout: 'gallery' }), /speaker_view or grid_view/);
 });
 
-// ── API v1.9.0 sync (MS-2274) ─────────────────────────────────────────────
+// ── API v1.9.0 sync ───────────────────────────────────────────────────────
 
 function mockFetchWithHeaders(status, body, headers = {}) {
   const calls = [];
@@ -373,4 +373,28 @@ test('calendar list uses GET /calendar/calendars', async () => {
   await new MeetStreamClient('K', { fetchImpl: f }).listCalendars();
   assert.equal(f.calls[0].init.method, 'GET');
   assert.match(f.calls[0].url, /\/api\/v1\/calendar\/calendars$/);
+});
+
+// ── Transcript printing ───────────────────────────────────────────────────
+
+import { transcriptToText } from '../src/output.js';
+
+test('transcriptToText: live shape (participant.name + words[].text)', () => {
+  const segments = [
+    {
+      participant: { id: 100, name: 'Nav', platform: 'desktop' },
+      words: [
+        { text: "I'll", start_timestamp: { relative: 31.4 } },
+        { text: 'write the migration doc by Friday.', start_timestamp: { relative: 32 } },
+      ],
+      language_code: 'en',
+    },
+    { participant: { id: 101, name: 'Maddy' }, words: [{ text: '' }] },
+    { participant: { id: 102 }, words: [{ text: 'Sounds good.' }] },
+  ];
+  assert.equal(transcriptToText(segments), "Nav: I'll write the migration doc by Friday.\nUnknown: Sounds good.");
+});
+
+test('transcriptToText: flat speaker/transcript shape still prints', () => {
+  assert.equal(transcriptToText([{ speaker: 'Alice', transcript: 'hello there' }]), 'Alice: hello there');
 });

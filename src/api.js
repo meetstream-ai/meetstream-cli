@@ -152,7 +152,7 @@ export class MeetStreamClient {
       if (tid) {
         try {
           const { data } = await this.getTranscriptById(tid, { raw });
-          // Live API may wrap segments in a `message` key: { message: [ {speaker, transcript, ...} ] }
+          // Live API may wrap segments in a `message` key: { message: [ {participant, words, ...} ] }
           const segments = Array.isArray(data) ? data : (Array.isArray(data?.message) ? data.message : data);
           if (segments && (Array.isArray(segments) ? segments.length : true)) {
             return { transcript_id: tid, transcript: segments };
@@ -387,7 +387,7 @@ export function buildCreateBotPayload(opts) {
     if (opts.zoomZakUrl) payload.zoom.zak_url = opts.zoomZakUrl;
     if (opts.zoomObfUrl) payload.zoom.obf_url = opts.zoomObfUrl;
   }
-  // Zoom join choice. Omitted = automatic: no setup, or the account's own Zoom app when it has one.
+  // use_own_app (API field): sent only when --zoom-use-own-app / --no-zoom-use-own-app is passed.
   if (typeof opts.zoomUseOwnApp === 'boolean') {
     payload.zoom = { ...(payload.zoom || {}), use_own_app: opts.zoomUseOwnApp };
   }
