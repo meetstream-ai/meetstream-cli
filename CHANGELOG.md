@@ -2,6 +2,12 @@
 
 All notable changes to `@meetstream/cli`.
 
+## 0.6.2 (2026-11-22)
+
+### Changed
+
+- README and AGENTS.md use the build tracks: 1. recording bot (1a post-call, 1b live), 2. bridge server (your own stack, local, with free local speech-to-text, LLM and text-to-speech options and a tunnel note), 3. Agents API infra (3a MeetStream's own default keys, 3b bring your own agent infra with LiveKit: coming soon, 3c bring your own keys, 3d local agent: coming soon). The local agent (`model.provider: "local_agent"`, Agent Kit) is no longer shown as available, and the README has no setup steps for it. The `mia check` row says the local agent is coming soon in production. No code change.
+
 ## 0.6.1 (2026-11-21)
 
 ### Fixed
