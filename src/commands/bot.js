@@ -21,7 +21,7 @@ export function registerBotCommands(program, getClient) {
     .option('-n, --name <name>', 'bot display name', 'MeetStream Bot')
     .option('--video', 'record video as well as audio (default: audio only)')
     .option('--video-layout <layout>', 'with --video: speaker_view (default) or grid_view; Google Meet and Teams also accept speaker_view_default, grid_view_default')
-    .option('-t, --transcript <provider>', 'deepgram | assemblyai | sarvam | meetstream | jigsawstack | smallest | meeting_captions | deepgram_streaming | assemblyai_streaming | smallest_streaming (smallest* need your Smallest AI key saved in the dashboard)')
+    .option('-t, --transcript <provider>', 'deepgram | assemblyai | sarvam | meetstream | jigsawstack (Interfaze, formerly JigsawStack) | smallest | meeting_captions | deepgram_streaming | assemblyai_streaming | smallest_streaming (smallest* need your Smallest AI key saved in the dashboard)')
     .option('-l, --language <lang>', 'transcription language (provider-specific format)')
     .option('-c, --callback <url>', 'HTTPS webhook for lifecycle events')
     .option('--join-at <iso8601>', 'schedule a future join, e.g. 2026-07-02T15:00:00Z')
