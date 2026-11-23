@@ -165,7 +165,8 @@ meetstream transcript <bot_id> --wait
                                    Google Meet and Teams also accept
                                    speaker_view_default, grid_view_default
 -t, --transcript <provider>      deepgram | assemblyai | sarvam | meetstream |
-                                   jigsawstack | smallest | meeting_captions |
+                                   jigsawstack (Interfaze, formerly JigsawStack) |
+                                   smallest | meeting_captions |
                                    deepgram_streaming | assemblyai_streaming |
                                    smallest_streaming (smallest* need your Smallest AI
                                    key saved in the dashboard)
@@ -247,7 +248,7 @@ printf '%s' "$BOT_PASSWORD" | meetstream logins teams add --domain bots.example.
 |---------|---------------|
 | `transcript <bot-id> [--wait] [--raw] [--json]` | Fetches the transcript, resolving `transcript_id` automatically (it's never in webhooks). `--wait` polls until ready. Default output is readable `Speaker: text` lines. A failed transcript (`422`) prints `Transcript failed: <reason>` and the next step, and exits with code 4: it will not become ready, so fix the cause and run `transcribe`. |
 | `transcriptions <bot-id>` | Lists every transcription run for a bot - provider, status, download links |
-| `transcribe <bot-id> -p <provider>` | (Re-)transcribes a bot's recorded audio, optionally with a different provider (`deepgram`, `assemblyai`, `sarvam`, `meetstream`, `jigsawstack`, `smallest`) or language |
+| `transcribe <bot-id> -p <provider>` | (Re-)transcribes a bot's recorded audio, optionally with a different provider (`deepgram`, `assemblyai`, `sarvam`, `meetstream`, `jigsawstack` (Interfaze), `smallest`) or language |
 
 ### `calendar` - Google Calendar auto-join
 | Command | What it does |

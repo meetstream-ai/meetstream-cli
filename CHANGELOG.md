@@ -2,6 +2,12 @@
 
 All notable changes to `@meetstream/cli`.
 
+## 0.6.3 (2026-11-23)
+
+### Changed
+
+- JigsawStack has rebranded as Interfaze (MS-2382). `bot create --transcript` and `transcript --provider` help and the README name the `jigsawstack` provider "Interfaze (formerly JigsawStack)". The provider value `jigsawstack` (for example `-t jigsawstack`) does not change. No behavior change.
+
 ## 0.6.2 (2026-11-22)
 
 ### Changed

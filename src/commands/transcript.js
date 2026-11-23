@@ -41,7 +41,7 @@ export function registerTranscriptCommands(program, getClient) {
     .command('transcribe')
     .description('Run (or re-run) transcription on a bot\'s recorded audio')
     .argument('<bot-id>')
-    .option('-p, --provider <name>', 'deepgram | assemblyai | sarvam | meetstream | jigsawstack | smallest (needs your Smallest AI key saved in the dashboard)', 'deepgram')
+    .option('-p, --provider <name>', 'deepgram | assemblyai | sarvam | meetstream | jigsawstack (Interfaze, formerly JigsawStack) | smallest (needs your Smallest AI key saved in the dashboard)', 'deepgram')
     .option('-l, --language <lang>', 'language (provider-specific format)')
     .option('-c, --callback <url>', 'webhook to notify when done')
     .option('--json', 'JSON output')
