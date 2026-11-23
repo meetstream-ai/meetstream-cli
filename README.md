@@ -1,3 +1,6 @@
+> [!IMPORTANT]
+> **This Node CLI is replaced by [`meetstream` 1.x](https://github.com/meetstream-ai/cli)**, one Go binary with the same commands, config file and exit codes, plus setup, your own agent and calendar connect. The npm package name stays `@meetstream/cli`: run `npm install -g @meetstream/cli@latest`. Other installs: `pipx install meetstream-cli`, `brew install meetstream-ai/tap/meetstream`. This repository is archived; 0.6.2 was its last release.
+
 # MeetStream CLI
 
 **The MeetStream meeting-bot API from your terminal.** Create bots that join Zoom, Google Meet, and Microsoft Teams meetings; record, transcribe, and interact - without writing a line of code.
